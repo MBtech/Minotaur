@@ -286,7 +286,7 @@ void* spout (void *arg, std::string ip, int port)
     //  Initialize random number generator
     srandom ((unsigned) time (NULL));
 
-    std::ifstream datafile("book");    
+    std::ifstream datafile("ny-taxi.csv");    
     //std::string ptsentence ("Hello is it me you are looking for?");
     std::string ptsentence;
     int j = 0;
@@ -432,14 +432,23 @@ void* splitter(void *arg, std::vector<std::string> senderIP, std::vector<int> se
     return NULL;
 }
 
-void* count(void *arg, std::string receiverIP, int port)
+void* count(void *arg, std::string receiverIP, int port,
+std::vector<std::string> senderIP, std::vector<int> senderPort)
 {
     struct Arguments * param = (Arguments*) arg;
     zmq::context_t context(1);
+//
+    zmq::socket_t sender = key_sender_conn(param, context, senderIP, senderPort);
+    std::cout << "Splitter: Received the sender socket " << std::endl;
+
+//
     zmq::socket_t receiver = key_receiver_conn(param, context, receiverIP, port);
 
     std::cout << "Starting the count worker " << std::endl;
     //  Process tasks forever
+    std::clock_t start;
+    start = std::clock();
+    double duration;
     while(1) {
         zmq::message_t message;
 	std::string topic = s_recv(receiver);
@@ -453,7 +462,19 @@ void* count(void *arg, std::string receiverIP, int port)
         obj.convert(msg);
         long timeNSec = msg.timeNSec;
 	long timeSec = msg.timeSec;
+//
+        int n = param -> next_stage;
+        int * nPointer = &n;
 
+        StringArray *retmessage = (StringArray *) malloc(sizeof(StringArray));
+        int retlen_a[200];
+        int * retlen = (int *) malloc(sizeof(int));
+        MacArray * mac = (MacArray* ) malloc(sizeof(MacArray));
+
+        int route = 0;
+        int *pRoute = &route;
+
+//
 	std::vector<std::string> msg_buffer = msg.value;
         std::vector<std::string> mac_buffer = msg.gcm_tag;
 	char ct[MAX_WORD_LEN];
@@ -465,17 +486,91 @@ void* count(void *arg, std::string receiverIP, int port)
 	std::copy(m.begin(), m.end(), ct);
         enclave_count_execute(global_eid, ct , &ctLength, (char *)t.c_str());
 
-        struct timespec tv;
-        clock_gettime(CLOCK_REALTIME, &tv);
-	long latency = calLatency(tv.tv_sec, tv.tv_nsec, timeSec, timeNSec);
-        std::cout << "Latency: " << latency<<std::endl;
+//        struct timespec tv;
+  //      clock_gettime(CLOCK_REALTIME, &tv);
+//	long latency = calLatency(tv.tv_sec, tv.tv_nsec, timeSec, timeNSec);
+  //      std::cout << "Latency: " << latency<<std::endl;
 	msg_buffer.pop_back();
 	mac_buffer.pop_back();
- 	}
+	}
+//	std::cout << duration << std::endl;
+	clock_t end = clock();
+ 	duration = double(end - start) / CLOCKS_PER_SEC;
+
+        if(duration > 0.1){
+                enclave_top_execute(global_eid, nPointer, retmessage, retlen_a, retlen, mac, pRoute);
+                start = std::clock();
+	        for (int k = 0; k < *retlen; k++) {
+        	  //   Create the msgpack
+	        	  Message sendmsg;
+	//          std::cout << retmessage->array[k] << std::endl;
+        	  std::vector<std::string> send_data_buffer, send_gcm_tags;
+	          send_data_buffer.push_back(std::string(retmessage->array[k]));
+        	  sendmsg.value= send_data_buffer;
+	          send_gcm_tags.push_back(std::string((char*) mac->array[k]));
+        	  sendmsg.gcm_tag =send_gcm_tags;
+	          sendmsg.timeNSec = timeNSec;
+        	  sendmsg.timeSec = timeSec;
+
+	          msgpack::sbuffer packed;
+        	  msgpack::pack(&packed, sendmsg);
+
+	          message.rebuild(packed.size());
+        	  std::memcpy(message.data(), packed.data(), packed.size());
+
+	          s_sendmore(sender, std::to_string(*pRoute));
+        	  sender.send(message);
+	       }
+        }
+		
+	
     }
     return NULL;
 }
 
+void* aggregate(void *arg, std::string receiverIP, int port)
+{
+    struct Arguments * param = (Arguments*) arg;
+    zmq::context_t context(1);
+    zmq::socket_t receiver = key_receiver_conn(param, context, receiverIP, port);
+
+    std::cout << "Starting the aggregate worker " << std::endl;
+    //  Process tasks forever
+    while(1) {
+        zmq::message_t message;
+        std::string topic = s_recv(receiver);
+        receiver.recv(&message);
+
+        Message msg;
+        msgpack::unpacked unpacked_body;
+        msgpack::object_handle oh = msgpack::unpack(reinterpret_cast<const char *> (message.data()), message.size());
+
+        msgpack::object obj = oh.get();
+        obj.convert(msg);
+        long timeNSec = msg.timeNSec;
+        long timeSec = msg.timeSec;
+
+        std::vector<std::string> msg_buffer = msg.value;
+        std::vector<std::string> mac_buffer = msg.gcm_tag;
+        char ct[30];
+
+        for(int i=0; i< msg_buffer.size(); i++){
+        std::string m = msg_buffer.back();
+        std::string t = mac_buffer.back();
+        int ctLength = m.length();
+        std::copy(m.begin(), m.end(), ct);
+        enclave_aggregate_execute(global_eid, ct , &ctLength, (char *)t.c_str());
+
+        struct timespec tv;
+        clock_gettime(CLOCK_REALTIME, &tv);
+        long latency = calLatency(tv.tv_sec, tv.tv_nsec, timeSec, timeNSec);
+        std::cout << "Latency: " << latency<<std::endl;
+        msg_buffer.pop_back();
+        mac_buffer.pop_back();
+        }
+    }
+    return NULL;
+}
 
 int func_main(int argc, char** argv){
     const int count_threads = 6;
@@ -493,7 +588,7 @@ int func_main(int argc, char** argv){
         arg->id = atoi(argv[2]);
         arg->next_stage = split_threads;
         arg->prev_stage = 0;
-        spout((void*) arg, argv[3], atoi(argv[4]));
+        spout((void*) arg, std::string(argv[3]), atoi(argv[4]));
     }
     if(strcmp(argv[1], "splitter")==0){
         std::cout << "Starting splitter" << std::endl;
@@ -541,7 +636,26 @@ int func_main(int argc, char** argv){
         arg->id = atoi(argv[2]) ;
         arg->next_stage = 0;
         arg->prev_stage = split_threads;
-        count((void*)arg, argv[3], atoi(argv[4]));
+
+        std::vector<std::string> senderIP;
+        std::vector<int> senderPort;
+	
+	std::ifstream senderfile("aggregateIP");
+        std::string ip, port;
+        while(senderfile >> ip>>port){
+                senderIP.push_back(ip);
+                senderPort.push_back(stoi(port));
+                std::cout << ip << " " << port << std::endl;
+        }
+        count((void*)arg, argv[3], atoi(argv[4]), senderIP, senderPort);
+    }
+    if(strcmp(argv[1], "aggregate")==0){
+        std::cout << "Starting aggregator" << std::endl;
+        Arguments *arg = new Arguments;
+        arg->id = atoi(argv[2]) ;
+        arg->next_stage = 0;
+        arg->prev_stage = split_threads;
+        aggregate((void*)arg, argv[3], atoi(argv[4]));
     }
 
     return 0;

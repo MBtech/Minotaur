@@ -52,8 +52,11 @@ enclave {
     
     trusted{
         public void enclave_spout_execute([in, out] int * j, [in] int *n);
-        public void enclave_splitter_execute([in,size=100] char* csmessage, [in] int * slength, [in, size=16]  char* tag,[in] int* n, [out, isptr] StringArray* retmessage, [out, isary] word_len  retlen, [out] int * nc, [out, isptr]  MacArray* mac, [out] int * pRoute);
-        public void enclave_count_execute([in, size=30] char * csmessage,[in] int * slength, [in, size=16] char * gcm_tag);	
+        public void enclave_splitter_execute([in,size=200] char* csmessage, [in] int * slength, [in, size=16]  char* tag,[in] int* n, [out, isptr] StringArray* retmessage, [out, isary] word_len  retlen, [out] int * nc, [out, isptr]  MacArray* mac, [out] int * pRoute);
+        public void enclave_count_execute([in, size=200] char * csmessage,[in] int * slength, [in, size=16] char * gcm_tag);	
+        public void enclave_top_execute([in] int* n, [out, isptr] StringArray* retmessage, [out, isary] word_len  retlen, [out] int * nc, [out, isptr]  MacArray* mac, [out] int * pRoute);
+	public void enclave_aggregate_execute([in, size=200] char * csmessage,[in] int * slength, [in, size=16] char * gcm_tag);
+
     };
     /* 
      * ocall_print_string - invokes OCALL to display string buffer inside the enclave.

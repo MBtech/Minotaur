@@ -52,6 +52,8 @@ using namespace std;
  */
 
  std::map <std::string, int> count_map;
+ std::map <std::string, int> aggregate_map;
+
 static const unsigned char gcm_key[] = {
         0xee, 0xbc, 0x1f, 0x57, 0x48, 0x7f, 0x51, 0x92, 0x1c, 0x04, 0x65, 0x66,
         0x5f, 0x8a, 0xe6, 0xd1, 0x65, 0x8b, 0xb2, 0x6d, 0xe6, 0xf8, 0xa0, 0x69,
@@ -97,7 +99,7 @@ void encrypt(char * line, size_t length, char * p_dst, unsigned char * gcm_tag){
     //printf("%s", (char *) p_dst);
 //   aes_gcm_decrypt(p_src, src_len, p_dst, gcm_tag);
     if (SGX_ERROR_MAC_MISMATCH == sgx_status){
-       printf("Mac mismatch");
+//       printf("Mac mismatch");
     }else if (SGX_SUCCESS != sgx_status){
         printf("No sucess");
         }
@@ -127,7 +129,7 @@ void decrypt(char * line, size_t length, char * p_dst, char * gcm_tag){
 //    printf("%s", (char *) p_dst);
 //   aes_gcm_decrypt(p_src, src_len, p_dst, gcm_tag);
     if (SGX_ERROR_MAC_MISMATCH == sgx_status){
-       printf("Mac mismatch");
+//       printf("Mac mismatch");
     }else if (SGX_SUCCESS != sgx_status){
 	printf("No sucess");
 	}
@@ -171,14 +173,17 @@ void enclave_splitter_execute(char * csmessage, int *slength, char * tag, int *n
 
     //printf(p_dst);
 
-    std::vector<std::string> s =  split(p_dst);
+    std::vector<std::string> s =  split(p_dst,',');
     unsigned int j = 0;
     int count = s.size();
-    
+    count = 1; 
     *nc = count;
     int i = 0;
+    //Dropoff longitude 18, Dropoff latitude 4, Pickup longitude 16, Pickup latitude 17
+    word = s[18]+ "," +s[4]+ "," +s[16]+ "," +s[17];
     for(int k = 0; k<count; k++) {
-	word = s[k];	
+//	word = s[k];	
+	printf("%s", word.c_str());
         std::hash<std::string> hasher;
         long hashed = hasher(word);
         j = abs(hashed % n);
@@ -206,17 +211,128 @@ void enclave_count_execute(char* csmessage, int * slength, char * gcm_tag) {
 
      char p_dst[*slength];
     std::string ctsentence(csmessage, *slength);
-
     decrypt(csmessage, *slength, p_dst,(char *)gcm_tag);
-  
     std::string word (p_dst, p_dst+(*slength)); 
     if (count_map.find(word) != count_map.end()) {
-        count_map[word] += 1;
+        count_map[word.c_str()] += 1;
     } else {
-        count_map[word] = 1;
+        count_map[word.c_str()] = 1;
     }
     std::map<std::string, int > ::iterator it;
+    //printf(word.c_str());
+    // Printing the counts
+    /*
+    for (it = count_map.begin(); it != count_map.end(); it++) {
+        std::cout << it->first // string (key)
+                << ':'
+                << it->second // string's value
+                << std::endl;
+    }*/
+}
+
+std::string find_top_n_keys(std::map <std::string, int> mymap, int n){
+    std::vector<std::pair<std::string, int>> top_n(n);
+    std::partial_sort_copy(mymap.begin(),
+                           mymap.end(),
+                           top_n.begin(),
+                           top_n.end(),
+                           [](std::pair<const std::string, int> const& l,
+                              std::pair<const std::string, int> const& r)
+                           {
+                               return l.second > r.second;
+                           });
+    std::string top;
+    for (auto const& p: top_n)
+    {
+        char buffer [33];
+        snprintf(buffer, sizeof(buffer), "%d", p.second);
+        printf ("second: %s\n",buffer);
+	
+//	snprintf(buffer, sizeof(buffer), "%s", (p.first).c_str());
+//        printf ("first: %s\n",buffer);
+
+        std::string second(buffer);
+
+        top += p.first + "|" + second + ";";
+	printf("%d", count_map[p.first]);
+	printf("%s", p.first.c_str());
+	printf("%d", (p.first).length());
+    }
+
+    return top;
+}
+
+void enclave_top_execute(int *np, StringArray* retmessage, int *retlen, int * nc, MacArray * mac, int *pRoute){
+    std::string word;
+
+    int n = *np;
+    unsigned int j = 0;
+//    int count = s.size();
+    int count = 1;
+    *nc = count;
+    int i = 0;
+
+    int top_n = 3; 
+    word = find_top_n_keys(count_map, top_n);
     printf(word.c_str());
+
+    for(int k = 0; k<count; k++) {
+        std::hash<std::string> hasher;
+        long hashed = hasher(word);
+	printf("n is %d", n);
+	n = 1;
+        j = abs(hashed % n);
+
+        int len = snprintf(NULL, 0, "%d", j);
+        *pRoute = j;
+        //*((*retlen)+i) = word.length() + std::to_string(j).length() + 2;
+        *(retlen+i) = word.length();
+        //retmessage->array[i] = (char *) malloc(*(retlen+i) * sizeof(char));
+        //printf(word.c_str());
+        unsigned char ret_tag[16];
+        char gcm_ct [word.length()];
+        encrypt((char * )word.c_str(), word.length(), gcm_ct, ret_tag);
+        memcpy(mac->array[i], ret_tag, 16);
+        //snprintf((char *)mac->array[i], 16, "%s", (char *)ret_tag);           
+        memcpy(retmessage->array[i], gcm_ct, *(retlen+i));
+        //snprintf(retmessage->array[i], *(retlen+i), "%s", (char *) gcm_ct);
+
+        i = i+1;
+    }
+
+}
+
+void enclave_aggregate_execute(char* csmessage, int * slength, char * gcm_tag) {
+
+     char p_dst[*slength];
+    std::string ctsentence(csmessage, *slength);
+
+    decrypt(csmessage, *slength, p_dst,(char *)gcm_tag);
+    
+    std::vector<std::string> s =  split(p_dst,';');
+    std::string word;
+
+    for(std::vector<std::string>::iterator it = s.begin(); it != s.end(); ++it) {
+	std::string c = *it;
+	if(c.length()==0){
+	    continue;
+	}
+	std::vector<std::string> kv =  split(c.c_str(),'|');	
+    	std::string k = kv.front();
+
+	int v = atoi(kv.back().c_str());
+
+	if (aggregate_map.find(k) != aggregate_map.end()) {
+            aggregate_map[k.c_str()] += v;
+	} else {
+            aggregate_map[k.c_str()] = v;
+    	}
+    }
+	
+    int top_n = 3;
+    word = find_top_n_keys(aggregate_map, top_n);
+    printf(word.c_str());
+
     // Printing the counts
     /*
     for (it = count_map.begin(); it != count_map.end(); it++) {
