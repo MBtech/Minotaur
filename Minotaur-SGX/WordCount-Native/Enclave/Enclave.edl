@@ -52,8 +52,8 @@ enclave {
     
     trusted{
         public void enclave_spout_execute([in, out] int * j, [in] int *n);
-        public void enclave_splitter_execute([in,size=100] char* csmessage, [in] int* n, [out, isptr] StringArray* retmessage, [out, isary] word_len  retlen, [out] int * nc, [out] int * pRoute);
-        public void enclave_count_execute([in, size=30] char * csmessage);	
+        public void enclave_splitter_execute([in,size=100] char* csmessage, [in] int * slength,[in] int* n, [out, isptr] StringArray* retmessage, [out, isary] word_len  retlen, [out] int * nc, [out,isary] word_len pRoute);
+        public void enclave_count_execute([in, size=30] char * csmessage,[in] int * slength);	
     };
     /* 
      * ocall_print_string - invokes OCALL to display string buffer inside the enclave.

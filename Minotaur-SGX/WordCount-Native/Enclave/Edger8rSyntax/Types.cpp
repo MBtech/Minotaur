@@ -43,6 +43,7 @@
 
 #define ULP 2
 
+#define MAX_TUPLE_LEN 100
 /* used to compare double variables in order to avoid compile warnings */
 bool  almost_equal(double x, double y)
 {
