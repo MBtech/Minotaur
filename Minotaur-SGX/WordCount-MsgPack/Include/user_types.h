@@ -39,10 +39,11 @@
 #define MAX_WORD_LEN 30
 #define MAX_WORD_IN_SENTENCE 20
 #define MAX_TUPLE_LEN 100
+#define BUFFER_TIMEOUT 800
 
 typedef void *buffer_t;
 typedef int array_t[10];
-typedef int word_len[MAX_WORD_LEN];
+typedef int word_len[MAX_WORD_IN_SENTENCE];
 struct StringArray{
     char array[MAX_WORD_LEN][MAX_WORD_IN_SENTENCE];
 };

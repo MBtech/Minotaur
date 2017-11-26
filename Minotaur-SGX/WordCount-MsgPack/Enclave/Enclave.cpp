@@ -118,9 +118,6 @@ void decrypt(char * line, size_t length, char * p_dst, char * gcm_tag){
     uint32_t aad_len = sizeof(gcm_aad)/sizeof(gcm_aad[0]);
 
     uint8_t * t = reinterpret_cast<uint8_t *> (gcm_tag);
-/*    printf("%x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x \n", t[0],t[1], t[2],
-                        t[3], t[4], t[5], t[6], t[7], t[8], t[9], t[10], t[11], t[12], t[13], t[14],t[15]); 
-*/    //printf("IV length %d", iv_len);   
     sgx_status_t sgx_status;    
     //printf("%x %x %x", line[0], line[1], line[length-1]);
     sgx_status = sgx_rijndael128GCM_decrypt(reinterpret_cast<const sgx_aes_gcm_128bit_key_t *>(gcm_key), p_src, src_len, reinterpret_cast <uint8_t *>(p_dst), gcm_iv, iv_len, gcm_aad, aad_len, reinterpret_cast<sgx_aes_gcm_128bit_tag_t *>(gcm_tag));
@@ -163,14 +160,7 @@ void enclave_splitter_execute(char * csmessage, int *slength, char * tag, int *n
     int n = *np;
     char p_dst[*slength]; 
     std::string ctsentence(csmessage, *slength);
-//    printf("%d", ctsentence.length()); 
-    
     decrypt(csmessage,*slength, p_dst, (char *)tag);     
-///    printf(tag);
-    
-
-    //printf(p_dst);
-
     std::vector<std::string> s =  split(p_dst);
     unsigned int j = 0;
     int count = s.size();
@@ -184,7 +174,7 @@ void enclave_splitter_execute(char * csmessage, int *slength, char * tag, int *n
         j = abs(hashed % n);
 
         int len = snprintf(NULL, 0, "%d", j);
-        *pRoute = j;
+        *(pRoute+i) = j;
         //*((*retlen)+i) = word.length() + std::to_string(j).length() + 2;
         *(retlen+i) = word.length();
         //retmessage->array[i] = (char *) malloc(*(retlen+i) * sizeof(char));
@@ -197,7 +187,7 @@ void enclave_splitter_execute(char * csmessage, int *slength, char * tag, int *n
         //snprintf((char *)mac->array[i], 16, "%s", (char *)ret_tag);		
 	memcpy(retmessage->array[i], gcm_ct, *(retlen+i));
         //snprintf(retmessage->array[i], *(retlen+i), "%s", (char *) gcm_ct);
-
+//        printf("Routing to: %d", j);
         i = i+1;
     }
 }

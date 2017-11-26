@@ -38,11 +38,11 @@
 #include <time.h>
 #include "zhelpers.hpp"
 #include "zmq.hpp"
-#include "utils.hpp"
 #include <functional>
 #include <stdlib.h>
 #include <map>
 #include <fstream>
+#include <vector>
 
 # include <unistd.h>
 # include <pwd.h>
@@ -55,6 +55,8 @@
 #include "aesgcm.h"
 #include "message.hpp"
 #include <msgpack.hpp>
+
+#include "TimedBuffer.hpp"
 
 #include <boost/algorithm/string.hpp>
 
@@ -180,7 +182,7 @@ void print_error_message(sgx_status_t ret)
             break;
         }
     }
-    
+
     if (idx == ttl)
         printf("Error: Unexpected error occurred.\n");
 }
@@ -196,15 +198,15 @@ int initialize_enclave(void)
     sgx_launch_token_t token = {0};
     sgx_status_t ret = SGX_ERROR_UNEXPECTED;
     int updated = 0;
-    
-    /* Step 1: try to retrieve the launch token saved by last transaction 
+
+    /* Step 1: try to retrieve the launch token saved by last transaction
      *         if there is no token, then create a new one.
      */
     /* try to get the token saved in $HOME */
     const char *home_dir = getpwuid(getuid())->pw_dir;
-    
-    if (home_dir != NULL && 
-        (strlen(home_dir)+strlen("/")+sizeof(TOKEN_FILENAME)+1) <= MAX_PATH) {
+
+    if (home_dir != NULL &&
+            (strlen(home_dir)+strlen("/")+sizeof(TOKEN_FILENAME)+1) <= MAX_PATH) {
         /* compose the token path */
         strncpy(token_path, home_dir, strlen(home_dir));
         strncat(token_path, "/", strlen("/"));
@@ -259,172 +261,169 @@ int initialize_enclave(void)
 /* OCall functions */
 void ocall_print_string(const char *str)
 {
-    /* Proxy/Bridge will check the length and null-terminate 
-     * the input string to prevent buffer overflow. 
+    /* Proxy/Bridge will check the length and null-terminate
+     * the input string to prevent buffer overflow.
      */
     printf("%s\n", str);
 }
 
 
-void encrypt(char * line, size_t len_pt, unsigned char * gcm_ct, unsigned char * gcm_tag){
+void encrypt(char * line, size_t len_pt, unsigned char * gcm_ct, unsigned char * gcm_tag) {
     unsigned char * gcm_pt = reinterpret_cast<unsigned char *>(line);
-    //std::cout << gcm_pt << std::endl;
     aes_gcm_encrypt(gcm_pt, len_pt, gcm_ct, gcm_tag);
 }
 
-void* spout (void *arg, std::string ip, int port)
+void* spout (void *arg, std::vector<std::string> senderIP, std::vector<int> senderPort)
 {
-    zmq::context_t context (1);
+    zmq::context_t *context = new zmq::context_t(1);
     struct Arguments * param = (Arguments*) arg;
-    std::cout << param->next_stage << std::endl;
-    zmq::socket_t sender = shuffle_sender_conn(param, context, ip, port);
+//    std::cout << param->next_stage << std::endl;
+    zmq::socket_t* sender = shuffle_sender_conn(param, *context, senderIP[0], senderPort[0]);
     std::cout << "Starting spout with id " << param->id << std::endl;
-    zmq::message_t message(2);
+//    zmq::message_t* message = new zmq::message_t(1);
 
     //  Initialize random number generator
     srandom ((unsigned) time (NULL));
 
-    std::ifstream datafile("book");    
+    std::ifstream datafile("book");
     //std::string ptsentence ("Hello is it me you are looking for?");
     std::string ptsentence;
     int j = 0;
     int n = param->next_stage;
-    while(1){
-    while(std::getline(datafile, ptsentence)){
-	boost::trim(ptsentence);
-        //ptsentence = "Hark. They are speaking";
-	std::cout << ptsentence << "  "<<  ptsentence.length()<<std::endl;
-        Message msg;
-        msg.value= std::string(ptsentence);
 
-        enclave_spout_execute(global_eid,&j,&n);
-        struct timespec tv;
-        clock_gettime(CLOCK_REALTIME, &tv);
-        msg.timeNSec = tv.tv_nsec;
-	msg.timeSec = tv.tv_sec;
-	
-        msgpack::sbuffer packed; 
-        msgpack::pack(&packed, msg);
+    TimedBuffer s_buff(context,sender, BUFFER_TIMEOUT);
+    sleep(10);
+    while(1) {
+        while(std::getline(datafile, ptsentence)) {
+            boost::trim(ptsentence);
+            //ptsentence = "Hark. They are speaking";
+            std::cout << ptsentence << "  "<<  ptsentence.length()<<std::endl;
+            /*            unsigned char gcm_ct [ptsentence.length()];
+                        uint8_t gcm_tag [16];
 
-	message.rebuild(packed.size());
-        std::memcpy(message.data(), packed.data(), packed.size());
-
-        s_sendmore(sender, std::to_string(j));
-        //s_send(sender, message);
-        sender.send(message);
-        usleep(5);
-    }
-    	datafile.clear();
-	datafile.seekg(0);
+                        encrypt(strdup(ptsentence.c_str()), ptsentence.length(), gcm_ct, gcm_tag);
+                        std::string ctsentence((char *)gcm_ct, (int)ptsentence.length());
+                        std::string mac((char*) gcm_tag, 16);*/
+            enclave_spout_execute(global_eid,&j,&n);
+            //std::cout << "Routing to: " << j << std::endl;
+struct timespec tv;
+            clock_gettime(CLOCK_REALTIME, &tv);
+            s_buff.add_msg(j, ptsentence, tv.tv_sec, tv.tv_nsec);
+            s_buff.check_and_send();
+            usleep(10);
+            j++;
+        }
+        datafile.clear();
+        datafile.seekg(0);
     }
     return NULL;
 }
 
 void* splitter(void *arg, std::vector<std::string> senderIP, std::vector<int> senderPort,
-        std::vector<std::string> receiverIP, std::vector<int> receiverPort) {
+               std::vector<std::string> receiverIP, std::vector<int> receiverPort) {
     struct Arguments * param = (Arguments*) arg;
-    zmq::context_t context(1);
+    zmq::context_t* context = new zmq::context_t(1);
     //zmq::context_t context = zmq_ctx_new();
-    zmq::socket_t sender = key_sender_conn(param, context, senderIP, senderPort);
+    zmq::socket_t* sender = key_sender_conn(param, *context, senderIP, senderPort);
     std::cout << "Splitter: Received the sender socket " << std::endl;
-
-    zmq::socket_t receiver = shuffle_receiver_conn(param, context, receiverIP, receiverPort);
-
+    zmq::socket_t receiver = shuffle_receiver_conn(param, *context, receiverIP, receiverPort);
     std::cout << "Starting the splitter worker with id " << param->id << std::endl;
-
     std::cout << "Reading messages, splitter" << std::endl;
+
+    TimedBuffer s_buff(context,sender, BUFFER_TIMEOUT);
     //  Process tasks forever
     while (1) {
         zmq::message_t message;
 
         std::string word;
-	std::string topic = s_recv(receiver);
+        std::string topic = s_recv(receiver);
         receiver.recv(&message);
-     
-	Message msg;
+
+        Message msg;
         msgpack::unpacked unpacked_body;
         msgpack::object_handle oh = msgpack::unpack(reinterpret_cast<const char *> (message.data()), message.size());
-     
+
         msgpack::object obj = oh.get();
         obj.convert(msg);
-        long timeSec = msg.timeSec;
-	long timeNSec = msg.timeNSec;
-//	std::cout << time << std::endl;
-
-	int n = param -> next_stage;
+        std::vector<long> timeNSec = msg.timeNSec;
+        std::vector<long> timeSec = msg.timeSec;
+        int n = param -> next_stage;
         int * nPointer = &n;
 
         StringArray *retmessage = (StringArray *) malloc(sizeof(StringArray));
         int retlen_a[20];
         int * retlen = (int *) malloc(sizeof(int));
-	
-	MacArray * mac = (MacArray* ) malloc(sizeof(MacArray));
+//        MacArray * mac = (MacArray* ) malloc(sizeof(MacArray));
 
-	int route = 0;
-        int *pRoute = &route;
-	
-	enclave_splitter_execute(global_eid, (char *) msg.value.c_str(), nPointer, retmessage, retlen_a, retlen, pRoute);
+        int pRoute[20];
 
-//        std::cout << "Total Message " << *retlen << std::endl;
-        for (int k = 0; k < *retlen; k++) {
-	  //   Create the msgpack
-    	  Message sendmsg;
-//          std::cout << retmessage->array[k] << std::endl;
-          sendmsg.value= std::string(retmessage->array[k]);
-          sendmsg.timeNSec = timeNSec;
-          sendmsg.timeSec = timeSec;
+        std::vector<std::string> msg_buffer = msg.value;
+//        std::vector<std::string> mac_buffer = msg.gcm_tag;
+std::vector<std::string>::iterator it;
+        std::vector<long>::iterator it2, it3;
+        for(it = msg_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); it != msg_buffer.end(); ++it, ++it2, ++it3) {
+            std::string val = *it;
+//            std::string tag = *it1;
+            char ct [100];
+            int ctLength = val.length();
+            std::copy(val.begin(), val.end(), ct);
 
-          msgpack::sbuffer packed;
-          msgpack::pack(&packed, sendmsg);
-
-          message.rebuild(packed.size());
-          std::memcpy(message.data(), packed.data(), packed.size());
-
-          s_sendmore(sender, std::to_string(*pRoute));
-          sender.send(message);  
+            enclave_splitter_execute(global_eid, ct, &ctLength,nPointer, retmessage, retlen_a, retlen, pRoute);
+            for (int k = 0; k < *retlen; k++) {
+                //std::cout << "k = " <<  k << std::endl;
+                //std::cout << pRoute[k] << std::endl;
+                s_buff.add_msg(pRoute[k], std::string(retmessage->array[k], retlen_a[k]), *it2, *it3);
+                s_buff.check_and_send();
+            }
         }
 
-    
-}
+    }
     return NULL;
 }
 
-void* count(void *arg, std::string receiverIP, int port)
+void* count(void *arg, std::vector<std::string> receiverIP, std::vector<int> receiverPort)
 {
     struct Arguments * param = (Arguments*) arg;
     zmq::context_t context(1);
-    zmq::socket_t receiver = key_receiver_conn(param, context, receiverIP, port);
+    zmq::socket_t receiver = key_receiver_conn(param, context, receiverIP[0], receiverPort[0]);
 
     std::cout << "Starting the count worker " << std::endl;
     //  Process tasks forever
     while(1) {
         zmq::message_t message;
-	std::string topic = s_recv(receiver);
+        std::string topic = s_recv(receiver);
         receiver.recv(&message);
-       
+
         Message msg;
         msgpack::unpacked unpacked_body;
-	msgpack::object_handle oh = msgpack::unpack(reinterpret_cast<const char *> (message.data()), message.size());
-        //msgpack::unpack(&unpacked_body, reinterpret_cast<const char *> (message.data()), message.size());
-        //std::string smessage(static_cast<char*> (message.data()), message.size());
+        msgpack::object_handle oh = msgpack::unpack(reinterpret_cast<const char *> (message.data()), message.size());
 
         msgpack::object obj = oh.get();
         obj.convert(msg);
-        long timeSec = msg.timeSec;
-	long timeNSec = msg.timeNSec;
+        std::vector<long> timeNSec = msg.timeNSec;
+        std::vector<long> timeSec = msg.timeSec;
 
-        enclave_count_execute(global_eid, (char *) msg.value.c_str());
+        std::vector<std::string> msg_buffer = msg.value;
+        char ct[100];
+        std::vector<std::string>::iterator it;
+        std::vector<long>::iterator it2, it3;
+        for(it = msg_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); it != msg_buffer.end(); ++it, ++it2, ++it3) {
+            std::string m = *it;
+            int ctLength = m.length();
+            std::copy(m.begin(), m.end(), ct);
+            enclave_count_execute(global_eid, ct , &ctLength);
 
-        struct timespec tv;
-        clock_gettime(CLOCK_REALTIME, &tv);
-	long lat = calLatency(tv.tv_sec, tv.tv_nsec, timeSec, timeNSec);
-        std::cout << "Latency: " << lat <<std::endl;
+            struct timespec tv;
+            clock_gettime(CLOCK_REALTIME, &tv);
+            long latency = calLatency(tv.tv_sec, tv.tv_nsec, *it2, *it3);
+            std::cout << "Latency: " << latency<<std::endl;
+        }
     }
     return NULL;
 }
 
 
-int func_main(int argc, char** argv){
+int func_main(int argc, char** argv) {
     const int count_threads = 6;
     const int split_threads = 4;
     const int spout_threads = 2;
@@ -433,16 +432,20 @@ int func_main(int argc, char** argv){
     pthread_t split_t[split_threads];
     pthread_t count_t[count_threads];
 
-    if(strcmp(argv[1], "spout")==0){
+    if(strcmp(argv[1], "spout")==0) {
         std::cout << spout_threads << std::endl;
         std::cout << "Starting spout" << std::endl;
         Arguments *arg = new Arguments;
         arg->id = atoi(argv[2]);
         arg->next_stage = split_threads;
         arg->prev_stage = 0;
-        spout((void*) arg, argv[3], atoi(argv[4]));
+        std::vector<int> senderPort;
+        std::vector<std::string> senderIP;
+        senderPort.push_back(atoi(argv[4]));
+        senderIP.push_back(std::string(argv[3]));
+        spout((void*) arg, senderIP, senderPort);
     }
-    if(strcmp(argv[1], "splitter")==0){
+    if(strcmp(argv[1], "splitter")==0) {
         std::cout << "Starting splitter" << std::endl;
         Arguments *arg = new Arguments;
         arg->id = atoi(argv[2]) ;
@@ -450,71 +453,59 @@ int func_main(int argc, char** argv){
         arg->prev_stage = spout_threads;
         std::vector<std::string> senderIP, receiverIP;
         std::vector<int> senderPort, receiverPort;
-        
-	std::ifstream senderfile("countIP");
-	std::string ip, port;
-	while(senderfile >> ip>>port){
-		senderIP.push_back(ip);
-		senderPort.push_back(stoi(port));
-		std::cout << ip << " " << port << std::endl;
-	}
-	
-	std::ifstream receiverfile("spoutIP");
+
+        std::ifstream senderfile("countIP");
+        std::string ip, port;
+        while(senderfile >> ip>>port) {
+            senderIP.push_back(ip);
+            senderPort.push_back(stoi(port));
+            std::cout << ip << " " << port << std::endl;
+        }
+
+        std::ifstream receiverfile("spoutIP");
         ip, port;
-        while(receiverfile >> ip>>port){
-                receiverIP.push_back(ip);
-                receiverPort.push_back(stoi(port));
+        while(receiverfile >> ip>>port) {
+            receiverIP.push_back(ip);
+            receiverPort.push_back(stoi(port));
         }
-/*        int nSender = atoi(argv[3]);
-        int nReceiver = atoi(argv[3+(nSender*2)+1]);
-        for(int i=0; i<nSender; i++){
-            senderIP.push_back(argv[4+i]);
-            std::cout << senderIP[i] << std::endl;
-            senderPort.push_back(atoi(argv[4+nSender+i]));
-            std::cout << senderPort[i] << std::endl;
-        }
-        for(int i=0; i<nReceiver; i++){
-            receiverIP.push_back(argv[4+(nSender*2)+i+1]);
-            std::cout << receiverIP[i] << std::endl;
-            receiverPort.push_back(atoi(argv[4+(2*nSender)+nReceiver+i+1]));
-            std::cout << receiverPort[i] << std::endl;
-        }
-*/
         splitter((void *)arg, senderIP, senderPort, receiverIP, receiverPort);
     }
-    if(strcmp(argv[1], "count")==0){
+    if(strcmp(argv[1], "count")==0) {
         std::cout << "Starting count" << std::endl;
         Arguments *arg = new Arguments;
         arg->id = atoi(argv[2]) ;
         arg->next_stage = 0;
         arg->prev_stage = split_threads;
-        count((void*)arg, argv[3], atoi(argv[4]));
+        std::vector<int> receiverPort;
+        std::vector<std::string> receiverIP;
+        receiverPort.push_back(atoi(argv[4]));
+        receiverIP.push_back(std::string(argv[3]));
+        count((void*)arg, receiverIP, receiverPort);
     }
 
     return 0;
 }
-
 int SGX_CDECL main(int argc, char *argv[])
 {
     printf("starting the program \n");
     (void)(argc);
     (void)(argv);
-    
+
     /* Initialize the enclave */
-    if(initialize_enclave() < 0){
+    if(initialize_enclave() < 0) {
         printf("Enter a character before exit ...\n");
         getchar();
-        return -1; 
+        return -1;
     }
 
-    printf("Starting the threads \n");    
+    printf("Starting the threads \n");
     func_main(argc, argv);
     /* Utilize edger8r attributes */
     edger8r_array_attributes();
     edger8r_pointer_attributes();
     edger8r_type_attributes();
     edger8r_function_attributes();
-    
+
     /* Utilize trusted libraries */
     ecall_libc_functions();
     ecall_libcxx_functions();
@@ -522,7 +513,7 @@ int SGX_CDECL main(int argc, char *argv[])
 
     /* Destroy the enclave */
     sgx_destroy_enclave(global_eid);
-    
+
     printf("Info: SampleEnclave successfully returned.\n");
 
     printf("Enter a character before exit ...\n");

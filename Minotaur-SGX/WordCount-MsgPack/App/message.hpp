@@ -4,7 +4,7 @@
 struct Message{
 	std::vector<std::string> value;
 	std::vector<std::string> gcm_tag;
-	long timeSec;
-	long timeNSec;
+	std::vector<long> timeSec;
+	std::vector<long> timeNSec;
         MSGPACK_DEFINE(value,gcm_tag, timeSec, timeNSec);
 };

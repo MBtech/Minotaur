@@ -118,9 +118,6 @@ void decrypt(char * line, size_t length, char * p_dst, char * gcm_tag){
     uint32_t aad_len = sizeof(gcm_aad)/sizeof(gcm_aad[0]);
 
     uint8_t * t = reinterpret_cast<uint8_t *> (gcm_tag);
-/*    printf("%x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x \n", t[0],t[1], t[2],
-                        t[3], t[4], t[5], t[6], t[7], t[8], t[9], t[10], t[11], t[12], t[13], t[14],t[15]); 
-*/    //printf("IV length %d", iv_len);   
     sgx_status_t sgx_status;    
     //printf("%x %x %x", line[0], line[1], line[length-1]);
     sgx_status = sgx_rijndael128GCM_decrypt(reinterpret_cast<const sgx_aes_gcm_128bit_key_t *>(gcm_key), p_src, src_len, reinterpret_cast <uint8_t *>(p_dst), gcm_iv, iv_len, gcm_aad, aad_len, reinterpret_cast<sgx_aes_gcm_128bit_tag_t *>(gcm_tag));
@@ -157,11 +154,11 @@ std::vector<std::string> split(const char * str, char c= ' '){
 
 	return result;
 }
-void enclave_splitter_execute(char * csmessage, int *np, StringArray* retmessage, int *retlen, int * nc, int *pRoute) {
-    //printf("Inside the enclave");
+void enclave_splitter_execute(char * csmessage, int *slength, int *np, StringArray* retmessage, int *retlen, int * nc, int *pRoute) {
     std::string word;
     int n = *np;
-
+    char p_dst[*slength]; 
+    std::string ctsentence(csmessage, *slength);
     std::vector<std::string> s =  split(csmessage);
     unsigned int j = 0;
     int count = s.size();
@@ -172,23 +169,20 @@ void enclave_splitter_execute(char * csmessage, int *np, StringArray* retmessage
 	word = s[k];	
         std::hash<std::string> hasher;
         long hashed = hasher(word);
-        j = hashed % n;
-
+        j = abs(hashed % n);
         int len = snprintf(NULL, 0, "%d", j);
-        *pRoute = j;
-        //*((*retlen)+i) = word.length() + std::to_string(j).length() + 2;
+        *(pRoute+i) = j;
         *(retlen+i) = word.length();
-        //retmessage->array[i] = (char *) malloc(*(retlen+i) * sizeof(char));
-        printf(word.c_str());
+	char gcm_ct [word.length()];
 	memcpy(retmessage->array[i], word.c_str(), *(retlen+i));
-
         i = i+1;
     }
 }
 
-void enclave_count_execute(char* csmessage) {
+void enclave_count_execute(char* csmessage, int * slength) {
 
-    std::string word (csmessage); 
+     char p_dst[*slength];
+    std::string word (csmessage, csmessage+(*slength)); 
     if (count_map.find(word) != count_map.end()) {
         count_map[word] += 1;
     } else {
@@ -196,13 +190,5 @@ void enclave_count_execute(char* csmessage) {
     }
     std::map<std::string, int > ::iterator it;
     printf(word.c_str());
-    // Printing the counts
-    /*
-    for (it = count_map.begin(); it != count_map.end(); it++) {
-        std::cout << it->first // string (key)
-                << ':'
-                << it->second // string's value
-                << std::endl;
-    }*/
 }
 

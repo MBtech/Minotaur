@@ -5,12 +5,9 @@
 
 long calLatency(long endTime, long endNTime, long startTime, long startNTime){
 	long lat = 0;
-	if (endTime>startTime)
-		lat = endNTime + (1000000-startNTime);
-	else
-		lat = endNTime - startNTime;
-	
-	return lat/1000;
+        double temp  = ((double)endTime + 1.0e-9*endNTime) - ((double)startTime + 1.0e-9*startNTime);
+        lat = temp * 1.0e6;	
+	return lat;
 }
 // Function to setup connection for a receiver endpoint of a key based grouping
 zmq::socket_t key_receiver_conn(Arguments * param, zmq::context_t & context, std::string ip, int port){

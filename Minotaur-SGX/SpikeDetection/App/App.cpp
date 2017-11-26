@@ -291,8 +291,8 @@ void* spout (void *arg, std::vector<std::string> senderIP, std::vector<int> send
     int j = 0;
     int n = param->next_stage;
 
-    TimedBuffer s_buff(context,sender);
-      sleep(10);
+    TimedBuffer s_buff(context,sender,BUFFER_TIMEOUT);
+    sleep(10);
     while(1) {
         while(std::getline(datafile, ptsentence)) {
             boost::trim(ptsentence);
@@ -304,10 +304,17 @@ void* spout (void *arg, std::vector<std::string> senderIP, std::vector<int> send
             encrypt(strdup(ptsentence.c_str()), ptsentence.length(), gcm_ct, gcm_tag);
             std::string ctsentence((char *)gcm_ct, (int)ptsentence.length());
             std::string mac((char*) gcm_tag, 16);
-	    enclave_spout_execute(global_eid,&j,&n);
 
-	    s_buff.add_msg(j, ctsentence, mac);
-            s_buff.check_and_send();
+	    Routes * routes = (Routes*) malloc(sizeof(Routes));
+            enclave_spout_execute(global_eid,(char*)ptsentence.c_str(),&n,routes);
+
+            struct timespec tv;
+            clock_gettime(CLOCK_REALTIME, &tv);
+	    for(int i=0; i<ROUTES; i++){
+		std::cout << routes->array[0][i] << std::endl;
+            	s_buff.add_msg(routes->array[0][i], ctsentence, mac, tv.tv_sec, tv.tv_nsec);
+            	s_buff.check_and_send();
+            }
             usleep(10);
         }
         datafile.clear();
@@ -326,8 +333,8 @@ void* splitter(void *arg, std::vector<std::string> senderIP, std::vector<int> se
     zmq::socket_t receiver = key_receiver_conn(param, *context, receiverIP[0], receiverPort[0]);
     std::cout << "Starting the splitter worker with id " << param->id << std::endl;
     std::cout << "Reading messages, splitter" << std::endl;
-    
-    TimedBuffer s_buff(context,sender);
+
+    TimedBuffer s_buff(context,sender, BUFFER_TIMEOUT);
     //  Process tasks forever
     while (1) {
         zmq::message_t message;
@@ -335,15 +342,15 @@ void* splitter(void *arg, std::vector<std::string> senderIP, std::vector<int> se
         std::string word;
         std::string topic = s_recv(receiver);
         receiver.recv(&message);
-
         Message msg;
         msgpack::unpacked unpacked_body;
         msgpack::object_handle oh = msgpack::unpack(reinterpret_cast<const char *> (message.data()), message.size());
 
         msgpack::object obj = oh.get();
         obj.convert(msg);
-        long timeNSec = msg.timeNSec;
-        long timeSec = msg.timeSec;
+
+        std::vector<long> timeNSec = msg.timeNSec;
+        std::vector<long> timeSec = msg.timeSec;
         int n = param -> next_stage;
         int * nPointer = &n;
 
@@ -358,16 +365,17 @@ void* splitter(void *arg, std::vector<std::string> senderIP, std::vector<int> se
         std::vector<std::string> mac_buffer = msg.gcm_tag;
 
         std::vector<std::string>::iterator it, it1;
-        for(it = msg_buffer.begin(), it1 = mac_buffer.begin(); it != msg_buffer.end(); ++it, ++it1) {
-            std::string val = *it;
-            std::string tag = *it1;
+        std::vector<long>::iterator it2, it3;
+        for(it = msg_buffer.begin(), it1 = mac_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); it != msg_buffer.end(); ++it, ++it1, ++it2, ++it3) {
+            std::string val = std::string(*it);
+            std::string tag = std::string(*it1);
             char ct [100];
             int ctLength = val.length();
             std::copy(val.begin(), val.end(), ct);
 
             enclave_ma_execute(global_eid, ct, &ctLength, (char *)tag.c_str(),nPointer, retmessage, retlen_a, retlen, mac, pRoute);
             for (int k = 0; k < *retlen; k++) {
-		s_buff.add_msg(pRoute[k], std::string(retmessage->array[k], retlen_a[k]),std::string((char*) mac->array[k], 16));
+                s_buff.add_msg(pRoute[k], std::string(retmessage->array[k], retlen_a[k]),std::string((char*) mac->array[k], 16), *it2, *it3);
                 s_buff.check_and_send();
             }
         }
@@ -395,28 +403,29 @@ void* count(void *arg, std::vector<std::string> receiverIP, std::vector<int> rec
 
         msgpack::object obj = oh.get();
         obj.convert(msg);
-        long timeNSec = msg.timeNSec;
-        long timeSec = msg.timeSec;
+        std::vector<long> timeNSec = msg.timeNSec;
+        std::vector<long> timeSec = msg.timeSec;
 
         std::vector<std::string> msg_buffer = msg.value;
         std::vector<std::string> mac_buffer = msg.gcm_tag;
         char ct[100];
 
-	char tag[16];
-        for(int i=0; i< msg_buffer.size(); i++) {
-		std::string m = msg_buffer.back();
-		std::string t = mac_buffer.back();
+        char tag[16];
+
+        std::vector<std::string>::iterator it, it1;
+        std::vector<long>::iterator it2, it3;
+        for(it = msg_buffer.begin(), it1 = mac_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); it != msg_buffer.end(); ++it, ++it1, ++it2, ++it3) {
+            std::string m = *it;
+            std::string t = *it1;
             int ctLength = m.length();
             std::copy(m.begin(), m.end(), ct);
-	    std::copy(t.begin(), t.end(), tag);
+            std::copy(t.begin(), t.end(), tag);
             enclave_spike_execute(global_eid, ct , &ctLength, tag);
 
             struct timespec tv;
             clock_gettime(CLOCK_REALTIME, &tv);
-            long latency = calLatency(tv.tv_sec, tv.tv_nsec, timeSec, timeNSec);
+            long latency = calLatency(tv.tv_sec, tv.tv_nsec, *it2, *it3);
             std::cout << "Latency: " << latency<<std::endl;
-            msg_buffer.pop_back();
-            mac_buffer.pop_back();
         }
     }
     return NULL;
@@ -424,9 +433,9 @@ void* count(void *arg, std::vector<std::string> receiverIP, std::vector<int> rec
 
 
 int func_main(int argc, char** argv) {
-    const int count_threads = 1;
-    const int split_threads = 1;
-    const int spout_threads = 1;
+    const int count_threads = 6;
+    const int split_threads = 4;
+    const int spout_threads = 2;
 
     pthread_t spout_t[spout_threads];
     pthread_t split_t[split_threads];
@@ -436,13 +445,13 @@ int func_main(int argc, char** argv) {
         std::cout << spout_threads << std::endl;
         std::cout << "Starting spout" << std::endl;
         Arguments *arg = new Arguments;
-        arg->id = atoi(argv[2]);
+        arg->id = stoi(argv[2]);
         arg->next_stage = split_threads;
         arg->prev_stage = 0;
         std::vector<std::string> senderIP;
-	std::vector<int> senderPort;
-	std::cout << "Reading IPs from file" << std::endl;
-	std::ifstream senderfile("splitIP");
+        std::vector<int> senderPort;
+        std::cout << "Reading IPs from file" << std::endl;
+        std::ifstream senderfile("splitIP");
         std::string ip, port;
         while(senderfile >> ip>>port) {
             senderIP.push_back(ip);
@@ -459,19 +468,21 @@ int func_main(int argc, char** argv) {
         arg->prev_stage = spout_threads;
         std::vector<std::string> senderIP, receiverIP;
         std::vector<int> senderPort, receiverPort;
-
-        std::ifstream senderfile("spikeIP");
-        std::string ip, port;
-        while(senderfile >> ip>>port) {
-            senderIP.push_back(ip);
-            senderPort.push_back(stoi(port));
-            std::cout << ip << " " << port << std::endl;
-        }
-
+        /*
+                std::ifstream senderfile("spikeIP");
+                std::string ip, port;
+                while(senderfile >> ip>>port) {
+                    senderIP.push_back(ip);
+                    senderPort.push_back(stoi(port));
+                    std::cout << ip << " " << port << std::endl;
+                }
+        */
+        senderPort.push_back(atoi(argv[6]));
+        senderIP.push_back(argv[5]);
         receiverIP.push_back(argv[3]);
         receiverPort.push_back(atoi(argv[4]));
-	
-	splitter((void *)arg, senderIP, senderPort, receiverIP, receiverPort);
+
+        splitter((void *)arg, senderIP, senderPort, receiverIP, receiverPort);
     }
     if(strcmp(argv[1], "count")==0) {
         std::cout << "Starting count" << std::endl;
@@ -481,7 +492,7 @@ int func_main(int argc, char** argv) {
         arg->prev_stage = split_threads;
         std::vector<std::string> receiverIP;
         std::vector<int> receiverPort;
-	std::ifstream senderfile("spikeIP");
+        std::ifstream senderfile("spikeIP");
         std::string ip, port;
         while(senderfile >> ip>>port) {
             receiverIP.push_back(ip);

@@ -12,7 +12,6 @@
 
 #endif	/* UTILS_HPP */
 #include "zmq.hpp"
-#define MAX_TUPLE_LEN 100
 struct Arguments{
     const char * ip; 
     int id;
@@ -23,7 +22,7 @@ struct Arguments{
 long calLatency(long endtime, long endNtime, long startTime, long startNTime);
 
 zmq::socket_t key_receiver_conn(Arguments * param, zmq::context_t & context, std::string ip, int port);
-zmq::socket_t key_sender_conn(Arguments * param, zmq::context_t & context, std::vector<std::string> ip, std::vector<int> port);
+zmq::socket_t* key_sender_conn(Arguments * param, zmq::context_t & context, std::vector<std::string> ip, std::vector<int> port);
 zmq::socket_t shuffle_receiver_conn(Arguments * param, zmq::context_t & context, 
         std::vector<std::string> ip, std::vector<int> port);
-zmq::socket_t shuffle_sender_conn(Arguments * param, zmq::context_t & context, std::string ip, int port);
+zmq::socket_t* shuffle_sender_conn(Arguments * param, zmq::context_t & context, std::string ip, int port);

@@ -51,8 +51,8 @@ enclave {
     from "TrustedLibrary/Thread.edl" import *;
     
     trusted{
-        public void enclave_spout_execute([in, out] int * j, [in] int *n);
-        public void enclave_ma_execute([in,size=100] char* csmessage, [in] int * slength, [in, size=16]  char* tag,[in] int* n, [out, isptr] StringArray* retmessage, [out, isary] word_len  retlen, [out] int * nc, [out, isptr]  MacArray* mac, [out] int * pRoute);
+        public void enclave_spout_execute([in, size=100] char * csmessage, [in] int *n, [out, isptr] Routes* routes);
+        public void enclave_ma_execute([in,size=100] char* csmessage, [in] int * slength, [in, size=16]  char* tag,[in] int* n, [out, isptr] StringArray* retmessage, [out, isary] word_len  retlen, [out] int * nc, [out, isptr]  MacArray* mac, [out, isary] word_len pRoute);
         public void enclave_spike_execute([in, size=100] char * csmessage,[in] int * slength, [in, size=16] char * gcm_tag);	
     };
     /* 

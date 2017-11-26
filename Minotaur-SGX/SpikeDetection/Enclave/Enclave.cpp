@@ -44,6 +44,8 @@
 
 #include "sgx_tcrypto.h"
 
+#include "eutils.hpp"
+
 using namespace std;
 
 /*
@@ -124,12 +126,8 @@ void decrypt(char * line, size_t length, char * p_dst, char * gcm_tag) {
 int enclave_shuffle_routing(int j, int n) {
     j++;
     j = j% n;
+    //get_route(, int n, int algo, int nroutes);
     return j;
-}
-
-// What needs to happen within the enclave?
-void enclave_spout_execute(int* j, int* n) {
-    *j = enclave_shuffle_routing(*j,*n);
 }
 
 std::vector<std::string> split(const char * str, char c= ' ') {
@@ -143,6 +141,11 @@ std::vector<std::string> split(const char * str, char c= ' ') {
 
     return result;
 }
+void enclave_spout_execute(char* csmessage,  int* n, Routes* routes) {
+	std::vector<std::string> s = split(csmessage);
+        std::vector<int> r = get_route(s[2],*n, ROUTE_ALGO,ROUTE_LEN);
+        std::copy(r.begin(), r.end(), routes->array[0]);
+}
 /*
 Moving average enclave function
 */
@@ -152,6 +155,7 @@ void enclave_ma_execute(char * csmessage, int *slength, char * tag, int *np, Str
     char p_dst[*slength];
     std::string ctsentence(csmessage, *slength);
     decrypt(csmessage,*slength, p_dst, (char *)tag);
+//    printf(p_dst);
     std::vector<std::string> s =  split(p_dst);
     unsigned int j = 0;
 
@@ -178,10 +182,11 @@ void enclave_ma_execute(char * csmessage, int *slength, char * tag, int *np, Str
     
     int i =0;
     int len = snprintf(NULL, 0, "%d", j);
-    *pRoute = j;
+    *(pRoute+i) = j;
     *(retlen+i) = tuple.length();
     unsigned char ret_tag[16];
     char gcm_ct [tuple.length()];
+    //printf(tuple.c_str());
     encrypt((char * )tuple.c_str(), tuple.length(), gcm_ct, ret_tag);
     memcpy(mac->array[i], ret_tag, 16);
     memcpy(retmessage->array[i], gcm_ct, *(retlen+i));
@@ -198,6 +203,7 @@ void enclave_spike_execute(char* csmessage, int * slength, char * gcm_tag) {
     double avg = atof(s[1].c_str());
     double val = atof(s[2].c_str());
     double threshold = 0.5; 
+    printf(csmessage);
     if((val-avg) > threshold * avg){
  	printf("Spike occurred");
     }

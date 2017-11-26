@@ -35,19 +35,30 @@
 
 #define LOOPS_PER_THREAD 500
 #define BUFFER 10
-
+#define GCM_TAG_LEN 16
+#define MAX_WORD_LEN 30
+#define MAX_WORD_IN_SENTENCE 20
+#define MAX_TUPLE_LEN 100
+#define BUFFER_TIMEOUT 800
+#define MAX_ROUTES 20
+#define ROUTE_LEN 2 // Max routes to choose from
+#define ROUTES 1 // The number of routes to forward
+#define ROUTE_ALGO 4 // Routing type
 
 typedef void *buffer_t;
 typedef int array_t[10];
-typedef int word_len[20];
+typedef int word_len[MAX_WORD_IN_SENTENCE];
 struct StringArray{
-    char array[20][20];
+    char array[MAX_WORD_LEN][MAX_WORD_IN_SENTENCE];
 };
 typedef struct StringArray StringArray;
 
-
-
 struct MacArray{
-     uint8_t array[16][20];    
+     uint8_t array[GCM_TAG_LEN][MAX_WORD_IN_SENTENCE];    
 };
 typedef struct MacArray MacArray;
+
+struct Routes{
+     int array[ROUTE_LEN][MAX_WORD_IN_SENTENCE];
+};
+typedef struct Routes Routes; 
