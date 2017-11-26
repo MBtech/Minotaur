@@ -380,7 +380,6 @@ void* splitter(void *arg, std::vector<std::string> senderIP, std::vector<int> se
     zmq::socket_t receiver = shuffle_receiver_conn(param, *context, receiverIP, receiverPort);
     std::cout << "Starting the splitter worker with id " << param->id << std::endl;
     std::cout << "Reading messages, splitter" << std::endl;
-
     TimedBuffer s_buff(context,sender, BUFFER_TIMEOUT);
     //  Process tasks forever
     while (1) {

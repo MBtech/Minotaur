@@ -405,7 +405,6 @@ void* count(void *arg, std::vector<std::string> receiverIP, std::vector<int> rec
         std::vector<std::string> msg_buffer = msg.value;
         std::vector<std::string> mac_buffer = msg.gcm_tag;
         char ct[100];
-
         char tag[16];
 
         std::vector<std::string>::iterator it, it1;

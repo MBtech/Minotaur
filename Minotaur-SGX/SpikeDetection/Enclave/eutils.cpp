@@ -48,7 +48,6 @@ std::vector<int> get_route(std::string key, int n, int algo, int nroutes) {
 	}	
 	load[min] +=1;
         routes.push_back(min);
-
     }
 
     return routes;
