@@ -42,13 +42,13 @@
 #define MAX_WORD_LEN 30
 #define MAX_WORD_IN_SENTENCE 20
 #define MAX_TUPLE_LEN 100
-#define BUFFER_TIMEOUT 800
+#define BUFFER_TIMEOUT 1000
 #define MAX_ROUTES 20
 #define ROUTE_LEN 1
 #define ROUTES 1
 #define ROUTE_ALGO 1
-//#define NATIVE
-#define SGX
+#define NATIVE
+//#define SGX
 //#define NOENCRY
 
 struct StringArray{

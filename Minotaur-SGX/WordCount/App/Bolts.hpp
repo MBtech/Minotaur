@@ -70,12 +70,9 @@
 
 void encrypt(char * line, size_t len_pt, unsigned char * gcm_ct, unsigned char * gcm_tag);
 
-void* spout (void *arg, std::vector<std::string> senderIP, std::vector<int> senderPort);
+void* spout (void *arg);
 
-void* splitter(void *arg, std::vector<std::string> senderIP, std::vector<int> senderPort,
-               std::vector<std::string> receiverIP, std::vector<int> receiverPort) ;
-
-void* count(void *arg, std::vector<std::string> receiverIP, std::vector<int> receiverPort);
-
+void* splitter(void* arg);
+void* count(void* arg);
 int func_main(int argc, char** argv);
 

@@ -38,14 +38,12 @@ void encrypt(char * line, size_t len_pt, unsigned char * gcm_ct, unsigned char *
 }
 #endif
 
-void* spout (void *arg, std::vector<std::string> senderIP, std::vector<int> senderPort)
+void* spout (void *arg)
 {
-    zmq::context_t *context = new zmq::context_t(1);
-    struct Arguments * param = (Arguments*) arg;
-//    std::cout << param->next_stage << std::endl;
-    zmq::socket_t* sender = shuffle_sender_conn(param, *context, senderIP[0], senderPort[0]);
-    std::cout << "Starting spout with id " << param->id << std::endl;
-//    zmq::message_t* message = new zmq::message_t(1);
+    zmq::context_t * context;
+    zmq::socket_t * sender, * receiver; 
+    int n = 0, m=0;
+    zmq_init(arg, context, sender, receiver, &n, &m);
 
     //  Initialize random number generator
     srandom ((unsigned) time (NULL));
@@ -54,7 +52,6 @@ void* spout (void *arg, std::vector<std::string> senderIP, std::vector<int> send
     //std::string ptsentence ("Hello is it me you are looking for?");
     std::string ptsentence;
     int j = 0;
-    int n = param->next_stage;
 
     TimedBuffer s_buff(context,sender, BUFFER_TIMEOUT);
     sleep(10);
@@ -62,34 +59,34 @@ void* spout (void *arg, std::vector<std::string> senderIP, std::vector<int> send
         while(std::getline(datafile, ptsentence)) {
             boost::trim(ptsentence);
             //ptsentence = "Hark. They are speaking";
-	    #ifdef SGX
+#ifdef SGX
             unsigned char gcm_ct [ptsentence.length()];
             uint8_t gcm_tag [16];
 
             encrypt(strdup(ptsentence.c_str()), ptsentence.length(), gcm_ct, gcm_tag);
             std::string ctsentence((char *)gcm_ct, (int)ptsentence.length());
             std::string mac((char*) gcm_tag, 16);
-            #endif
+#endif
 
-	    Routes * routes = (Routes* ) malloc(sizeof(Routes));
-            #ifdef NATIVE
-            enclave_spout_execute((char*) ptsentence.c_str(),&n,&j, routes); 
-            #else
-            enclave_spout_execute(global_eid,(char*) ptsentence.c_str(),&n,&j, routes); 
-            #endif
+            Routes * routes = (Routes* ) malloc(sizeof(Routes));
+#ifdef NATIVE
+            enclave_spout_execute((char*) ptsentence.c_str(),&n,&j, routes);
+#else
+            enclave_spout_execute(global_eid,(char*) ptsentence.c_str(),&n,&j, routes);
+#endif
             struct timespec tv;
             clock_gettime(CLOCK_REALTIME, &tv);
-	    for(int i=0; i<ROUTES; i++){
-		std::cout << routes->array[0][i] << std::endl;
+            for(int i=0; i<ROUTES; i++) {
+                std::cout << routes->array[0][i] << std::endl;
                 std::cout << ptsentence << "  "<<  ptsentence.length()<<std::endl;
-                #ifdef SGX
+#ifdef SGX
                 s_buff.add_msg(routes->array[0][i], ctsentence, mac, tv.tv_sec, tv.tv_nsec);
-		#else
-		s_buff.add_msg(routes->array[0][i], ptsentence, tv.tv_sec, tv.tv_nsec);
-		#endif
+#else
+                s_buff.add_msg(routes->array[0][i], ptsentence, tv.tv_sec, tv.tv_nsec);
+#endif
                 s_buff.check_and_send();
-	    }
-            usleep(10);
+            }
+            usleep(5);
         }
         datafile.clear();
         datafile.seekg(0);
@@ -97,25 +94,19 @@ void* spout (void *arg, std::vector<std::string> senderIP, std::vector<int> send
     return NULL;
 }
 
-void* splitter(void *arg, std::vector<std::string> senderIP, std::vector<int> senderPort,
-               std::vector<std::string> receiverIP, std::vector<int> receiverPort) {
-    struct Arguments * param = (Arguments*) arg;
-    zmq::context_t* context = new zmq::context_t(1);
-    //zmq::context_t context = zmq_ctx_new();
-    zmq::socket_t* sender = key_sender_conn(param, *context, senderIP, senderPort);
-    std::cout << "Splitter: Received the sender socket " << std::endl;
-    zmq::socket_t receiver = shuffle_receiver_conn(param, *context, receiverIP, receiverPort);
-    std::cout << "Starting the splitter worker with id " << param->id << std::endl;
-    std::cout << "Reading messages, splitter" << std::endl;
-
+void* splitter(void *arg) {
+    zmq::context_t * context;
+    zmq::socket_t * sender, * receiver;
+    int n = 0, m=0;
+    zmq_init(arg, context, sender, receiver, &n, &m);
     TimedBuffer s_buff(context,sender, BUFFER_TIMEOUT);
     //  Process tasks forever
     while (1) {
         zmq::message_t message;
 
         std::string word;
-        std::string topic = s_recv(receiver);
-        receiver.recv(&message);
+        std::string topic = s_recv(*receiver);
+        receiver->recv(&message);
 
         Message msg;
         msgpack::unpacked unpacked_body;
@@ -126,62 +117,62 @@ void* splitter(void *arg, std::vector<std::string> senderIP, std::vector<int> se
         std::vector<long> timeNSec = msg.timeNSec;
         std::vector<long> timeSec = msg.timeSec;
 
-	InputData * input = (InputData* ) malloc(sizeof(InputData));
-	OutputData * output = (OutputData* ) malloc(sizeof(OutputData));
+        InputData * input = (InputData* ) malloc(sizeof(InputData));
+        OutputData * output = (OutputData* ) malloc(sizeof(OutputData));
         std::vector<std::string> msg_buffer = msg.value;
-        #ifdef SGX
-	std::vector<std::string> mac_buffer = msg.gcm_tag;
-	#endif
+#ifdef SGX
+        std::vector<std::string> mac_buffer = msg.gcm_tag;
+#endif
 
         std::vector<std::string>::iterator it, it1;
         std::vector<long>::iterator it2, it3;
-	input->next_parallel = param->next_stage;
-        #ifdef SGX
-	it1 = mac_buffer.begin();
-	#endif
+        input->next_parallel = n;
+#ifdef SGX
+        it1 = mac_buffer.begin();
+#endif
         for(it = msg_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); it != msg_buffer.end(); ++it, ++it2, ++it3) {
             std::string val = *it;
-	    input->msg_len = val.length();
-	    std::copy(val.begin(), val.end(), input->message);
-	    #ifdef SGX
+            input->msg_len = val.length();
+            std::copy(val.begin(), val.end(), input->message);
+#ifdef SGX
             std::string tag = *it1;
-	    std::copy(tag.begin(), tag.end(), input->mac);
-	    #endif
-   	    #ifdef NATIVE
+            std::copy(tag.begin(), tag.end(), input->mac);
+#endif
+#ifdef NATIVE
             enclave_splitter_execute(input, output);
-		#else
+#else
             enclave_splitter_execute(global_eid, input, output);
-		#endif
-	    //std::cout << "Total message: " << output->total_msgs << std::endl;
+#endif
+            //std::cout << "Total message: " << output->total_msgs << std::endl;
             for (int k = 0; k < output->total_msgs; k++) {
-		#ifdef SGX
+#ifdef SGX
                 s_buff.add_msg(output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], 16), *it2, *it3);
-		#else
+#else
                 s_buff.add_msg(output->routes[k][0], std::string(output->message[k], output->msg_len[k]), *it2, *it3);
-		#endif
+#endif
                 s_buff.check_and_send();
             }
-	    #ifdef SGX
+#ifdef SGX
             ++it1;
-	    #endif
+#endif
         }
 
     }
     return NULL;
 }
 
-void* count(void *arg, std::vector<std::string> receiverIP, std::vector<int> receiverPort)
+void* count(void *arg)
 {
-    struct Arguments * param = (Arguments*) arg;
-    zmq::context_t context(1);
-    zmq::socket_t receiver = key_receiver_conn(param, context, receiverIP[0], receiverPort[0]);
-
+    zmq::context_t * context;
+    zmq::socket_t * sender, * receiver;
+    int n = 0, m=0;
+    zmq_init(arg, context, sender, receiver, &n, &m);
     std::cout << "Starting the count worker " << std::endl;
     //  Process tasks forever
     while(1) {
         zmq::message_t message;
-        std::string topic = s_recv(receiver);
-        receiver.recv(&message);
+        std::string topic = s_recv(*receiver);
+        receiver->recv(&message);
 
         Message msg;
         msgpack::unpacked unpacked_body;
@@ -194,42 +185,42 @@ void* count(void *arg, std::vector<std::string> receiverIP, std::vector<int> rec
 
         std::vector<std::string> msg_buffer = msg.value;
         char ct[100];
-	#ifdef SGX
+#ifdef SGX
         std::vector<std::string> mac_buffer = msg.gcm_tag;
         char tag[16];
-	#endif
+#endif
 
         std::vector<std::string>::iterator it, it1;
         std::vector<long>::iterator it2, it3;
-	#ifdef SGX
-	it1 = mac_buffer.begin();
-	#endif
+#ifdef SGX
+        it1 = mac_buffer.begin();
+#endif
         InputData * input = (InputData* ) malloc(sizeof(InputData));
 //        OutputData * output = (OutputData* ) malloc(sizeof(OutputData));
 
-        for(it = msg_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); it != msg_buffer.end(); ++it, ++it2, ++it3) { 
+        for(it = msg_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); it != msg_buffer.end(); ++it, ++it2, ++it3) {
             std::string m = *it;
             input->msg_len = m.length();
             std::copy(m.begin(), m.end(), input->message);
-	    #ifdef SGX
+#ifdef SGX
             std::string t = *it1;
             std::copy(t.begin(), t.end(), input->mac);
-	    #endif
-   	#ifdef NATIVE
-	    enclave_count_execute(input);
-	#else
-	    enclave_count_execute(global_eid, input);
-	#endif
+#endif
+#ifdef NATIVE
+            enclave_count_execute(input);
+#else
+            enclave_count_execute(global_eid, input);
+#endif
 //            enclave_count_execute(global_eid, ct , &ctLength, tag);
 
             struct timespec tv;
             clock_gettime(CLOCK_REALTIME, &tv);
-	    
+
             long latency = calLatency(tv.tv_sec, tv.tv_nsec, *it2, *it3);
             std::cout << "Latency: " << latency<<std::endl;
-	    #ifdef SGX
-	    ++it1;
-	    #endif
+#ifdef SGX
+            ++it1;
+#endif
         }
     }
     return NULL;
@@ -237,63 +228,83 @@ void* count(void *arg, std::vector<std::string> receiverIP, std::vector<int> rec
 
 
 int func_main(int argc, char** argv) {
-    const int count_threads = 6;
-    const int split_threads = 4;
-    const int spout_threads = 2;
+    std::map<std::string, int> parallelism;
 
-    pthread_t spout_t[spout_threads];
-    pthread_t split_t[split_threads];
-    pthread_t count_t[count_threads];
+    parallelism["spout"]  = 2;
+    parallelism["splitter"]  = 4;
+    parallelism["count"]  = 6;
+
+    std::map<std::string, std::map<std::string, std::vector<std::string>>> topo, grouping;
+    topo["spout"]["children"].push_back("splitter");
+    topo["splitter"]["parents"].push_back("spout");
+    topo["splitter"]["children"].push_back("count");
+    topo["count"]["parents"].push_back("splitter");
+
+    grouping["spout"]["out"].push_back("shuffle");
+    grouping["splitter"]["in"].push_back("shuffle");
+    grouping["splitter"]["out"].push_back("key");
+    grouping["count"]["in"].push_back("key");
+
+// TODO: Adapt this code to work for multiple output stages
+    Arguments * arg = new Arguments;
+    arg->id = atoi(argv[2]);
+
+    if(topo[argv[1]]["parents"].size()>0 ) {
+        arg->prev_stage = parallelism[topo[argv[1]]["parents"].back()];
+        arg->in_grouping.push_back(grouping[argv[1]]["in"].back());
+    } else {
+        arg->prev_stage = 0;
+    }
+    if(topo[argv[1]]["children"].size()>0 ) {
+        arg->next_stage = parallelism[topo[argv[1]]["children"].back()];
+        arg->out_grouping.push_back(grouping[argv[1]]["out"].back());
+    } else {
+        arg->next_stage = 0;
+    }
+    std::vector<std::string> senderIP, receiverIP;
+    std::vector<int> senderPort, receiverPort;
+    if(grouping[argv[1]]["in"].size()>0) {
+	if(grouping[argv[1]]["in"].back() =="key" ) {
+            receiverPort.push_back(atoi(argv[4]));
+            receiverIP.push_back(std::string(argv[3]));
+        } else {
+            std::string filename = topo[argv[1]]["parents"].back() + "IP";
+            std::ifstream receiverfile(filename);
+            std::string ip, port;
+            while(receiverfile >> ip>>port) {
+                receiverIP.push_back(ip);
+                receiverPort.push_back(stoi(port));
+                std::cout << ip << " " << port << std::endl;
+            }
+        }
+    }
+    if(grouping[argv[1]]["out"].size()>0) {
+        if(grouping[argv[1]]["out"].back() == "shuffle" ) {
+            senderPort.push_back(atoi(argv[4]));
+            senderIP.push_back(std::string(argv[3]));
+        } else {
+            std::string filename = topo[argv[1]]["children"].back() + "IP";
+            std::ifstream senderfile(filename);
+            std::string ip, port;
+            while(senderfile >> ip>>port) {
+                senderIP.push_back(ip);
+                senderPort.push_back(stoi(port));
+                std::cout << ip << " " << port << std::endl;
+            }
+        }
+    }
+
+    arg -> senderIP = senderIP;
+    arg -> receiverIP = receiverIP;
+    arg -> senderPort = senderPort;
+    arg-> receiverPort = receiverPort;
 
     if(strcmp(argv[1], "spout")==0) {
-        std::cout << spout_threads << std::endl;
-        std::cout << "Starting spout" << std::endl;
-        Arguments *arg = new Arguments;
-        arg->id = atoi(argv[2]);
-        arg->next_stage = split_threads;
-        arg->prev_stage = 0;
-        std::vector<int> senderPort;
-        std::vector<std::string> senderIP;
-        senderPort.push_back(atoi(argv[4]));
-        senderIP.push_back(std::string(argv[3]));
-        spout((void*) arg, senderIP, senderPort);
-    }
-    if(strcmp(argv[1], "splitter")==0) {
-        std::cout << "Starting splitter" << std::endl;
-        Arguments *arg = new Arguments;
-        arg->id = atoi(argv[2]) ;
-        arg->next_stage = count_threads;
-        arg->prev_stage = spout_threads;
-        std::vector<std::string> senderIP, receiverIP;
-        std::vector<int> senderPort, receiverPort;
-
-        std::ifstream senderfile("countIP");
-        std::string ip, port;
-        while(senderfile >> ip>>port) {
-            senderIP.push_back(ip);
-            senderPort.push_back(stoi(port));
-            std::cout << ip << " " << port << std::endl;
-        }
-
-        std::ifstream receiverfile("spoutIP");
-        ip, port;
-        while(receiverfile >> ip>>port) {
-            receiverIP.push_back(ip);
-            receiverPort.push_back(stoi(port));
-        }
-        splitter((void *)arg, senderIP, senderPort, receiverIP, receiverPort);
-    }
-    if(strcmp(argv[1], "count")==0) {
-        std::cout << "Starting count" << std::endl;
-        Arguments *arg = new Arguments;
-        arg->id = atoi(argv[2]) ;
-        arg->next_stage = 0;
-        arg->prev_stage = split_threads;
-        std::vector<int> receiverPort;
-        std::vector<std::string> receiverIP;
-        receiverPort.push_back(atoi(argv[4]));
-        receiverIP.push_back(std::string(argv[3]));
-        count((void*)arg, receiverIP, receiverPort);
+        spout((void*) arg);
+    } else if (strcmp(argv[1], "splitter")==0) {
+        splitter((void*) arg);
+    } else if(strcmp(argv[1], "count")==0) {
+        count((void*) arg);
     }
 
     return 0;
