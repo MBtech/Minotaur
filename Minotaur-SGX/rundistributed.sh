@@ -1,5 +1,5 @@
 #!/bin/bash
-dir=~/bilal/Minotaur/Minotaur-SGX/WordCount-Native
+dir=~/bilal/Minotaur/Minotaur-SGX/WordCount
 
 ssh 192.168.10.2 "sh -c 'cd $dir; ./cleanup.sh' "
 ssh 192.168.10.1 "sh -c 'cd $dir; ./cleanup.sh' "
@@ -45,7 +45,7 @@ do
 ssh 192.168.10.2 "sh -c 'cd $dir; nohup ./app count  $i 192.168.10.2 6000 > countlog$i 2>&1 &' "
 done
 
-sleep 200
+sleep 100
 
 ssh 192.168.10.2 "sh -c $dir/kill.sh"
 ssh 192.168.10.1 "sh -c $dir/kill.sh"

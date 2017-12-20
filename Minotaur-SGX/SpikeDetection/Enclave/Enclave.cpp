@@ -123,13 +123,6 @@ void decrypt(char * line, size_t length, char * p_dst, char * gcm_tag) {
     delete p_src;
 }
 
-int enclave_shuffle_routing(int j, int n) {
-    j++;
-    j = j% n;
-    //get_route(, int n, int algo, int nroutes);
-    return j;
-}
-
 std::vector<std::string> split(const char * str, char c= ' ') {
     std::vector<std::string> result;
     do {
