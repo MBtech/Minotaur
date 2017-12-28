@@ -12,6 +12,7 @@
 
 #endif	/* UTILS_HPP */
 #include "zmq.hpp"
+#include "user_types.h"
 struct Arguments{
     const char * ip; 
     int id;
@@ -24,7 +25,7 @@ struct Arguments{
 
 long calLatency(long endtime, long endNtime, long startTime, long startNTime);
 
-void zmq_init(void * arg, zmq::context_t* context, zmq::socket_t* sender, zmq::socket_t* receiver, int* forward, int* back );
+void zmq_init(void * arg, zmq::context_t* context, Sockets* socks, int* forward, int* back );
 
 zmq::socket_t* key_receiver_conn(Arguments * param, zmq::context_t & context, std::string ip, int port);
 

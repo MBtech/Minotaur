@@ -42,8 +42,9 @@ void* spout (void *arg)
 {
     zmq::context_t * context;
     zmq::socket_t * sender, * receiver; 
+    Sockets* socks = (Sockets*) malloc(sizeof(Sockets));
     int n = 0, m=0;
-    zmq_init(arg, context, sender, receiver, &n, &m);
+    zmq_init(arg, context, socks, &n, &m);
 
     //  Initialize random number generator
     srandom ((unsigned) time (NULL));
@@ -53,7 +54,7 @@ void* spout (void *arg)
     std::string ptsentence;
     int j = 0;
 
-    TimedBuffer s_buff(context,sender, BUFFER_TIMEOUT);
+    TimedBuffer s_buff(context,socks->sender, BUFFER_TIMEOUT);
     sleep(10);
     while(1) {
         while(std::getline(datafile, ptsentence)) {
@@ -97,16 +98,17 @@ void* spout (void *arg)
 void* splitter(void *arg) {
     zmq::context_t * context;
     zmq::socket_t * sender, * receiver;
+    Sockets* socks = (Sockets*) malloc(sizeof(Sockets));
     int n = 0, m=0;
-    zmq_init(arg, context, sender, receiver, &n, &m);
-    TimedBuffer s_buff(context,sender, BUFFER_TIMEOUT);
+    zmq_init(arg, context, socks, &n, &m);
+    TimedBuffer s_buff(context,socks->sender, BUFFER_TIMEOUT);
     //  Process tasks forever
     while (1) {
         zmq::message_t message;
 
         std::string word;
-        std::string topic = s_recv(*receiver);
-        receiver->recv(&message);
+        std::string topic = s_recv(*socks->receiver);
+        socks->receiver->recv(&message);
 
         Message msg;
         msgpack::unpacked unpacked_body;
@@ -165,14 +167,15 @@ void* count(void *arg)
 {
     zmq::context_t * context;
     zmq::socket_t * sender, * receiver;
+Sockets* socks = (Sockets*) malloc(sizeof(Sockets));
     int n = 0, m=0;
-    zmq_init(arg, context, sender, receiver, &n, &m);
+    zmq_init(arg, context, socks, &n, &m);
     std::cout << "Starting the count worker " << std::endl;
     //  Process tasks forever
     while(1) {
         zmq::message_t message;
-        std::string topic = s_recv(*receiver);
-        receiver->recv(&message);
+        std::string topic = s_recv(*socks->receiver);
+        socks->receiver->recv(&message);
 
         Message msg;
         msgpack::unpacked unpacked_body;

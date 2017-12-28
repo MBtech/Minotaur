@@ -31,6 +31,7 @@
 
 
 #include <stdint.h>
+#include "zhelpers.hpp"
 /* User defined types */
 #ifndef _USER_TYPESH_
 #define _USER_TYPESH_
@@ -42,7 +43,7 @@
 #define MAX_WORD_LEN 30
 #define MAX_WORD_IN_SENTENCE 20
 #define MAX_TUPLE_LEN 100
-#define BUFFER_TIMEOUT 1000
+#define BUFFER_TIMEOUT 400
 #define MAX_ROUTES 20
 #define ROUTE_LEN 1
 #define ROUTES 1
@@ -83,6 +84,13 @@ struct OutputData{
 #endif
         int routes[MAX_WORD_IN_SENTENCE][ROUTES];
 };
+
+struct Sockets{
+       zmq::socket_t* sender;
+       zmq::socket_t* receiver;
+};
+
+typedef struct Sockets Sockets;
 
 typedef void *buffer_t;
 typedef int array_t[10];
