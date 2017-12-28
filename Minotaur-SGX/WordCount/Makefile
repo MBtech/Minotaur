@@ -35,7 +35,7 @@ SGX_SDK ?= /opt/intel/sgxsdk
 SGX_MODE ?= HW
 SGX_ARCH ?= x64
 SGX_DEBUG ?= 1
-BUILD ?= NATIVE
+BUILD ?= SGX
 
 
 ifeq ($(shell getconf LONG_BIT), 32)
@@ -77,10 +77,10 @@ else
 endif
 
 ifeq ($(BUILD), SGX)
-App_Cpp_Files := App/App.cpp $(wildcard App/Edger8rSyntax/*.cpp) $(wildcard App/TrustedLibrary/*.cpp) App/aesgcm.cpp App/utils.cpp App/TimedBuffer.cpp App/Bolts.cpp
+App_Cpp_Files := App/App.cpp $(wildcard App/Edger8rSyntax/*.cpp) $(wildcard App/TrustedLibrary/*.cpp) App/aesgcm.cpp App/utils.cpp App/TimedBuffer.cpp App/Bolts.cpp App/Minotaur.cpp
 else
 #App_Cpp_Files := App/*.cpp
-App_Cpp_Files := App/App.cpp App/aesgcm.cpp App/utils.cpp App/TimedBuffer.cpp App/Bolts.cpp App/Executors.cpp App/eutils.cpp
+App_Cpp_Files := App/App.cpp App/aesgcm.cpp App/utils.cpp App/TimedBuffer.cpp App/Bolts.cpp App/Executors.cpp App/eutils.cpp App/Minotaur.cpp
 endif
 
 App_Include_Paths := -IInclude -IApp -I$(SGX_SDK)/include 

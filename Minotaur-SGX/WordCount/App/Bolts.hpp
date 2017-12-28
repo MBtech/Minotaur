@@ -57,22 +57,12 @@
 #endif
 
 #include "aesgcm.h"
-#include "message.hpp"
 #include <msgpack.hpp>
-
-#include "TimedBuffer.hpp"
 
 #ifdef NATIVE
 #include "Executors.hpp"
 #endif
 
-#include <boost/algorithm/string.hpp>
 
-void encrypt(char * line, size_t len_pt, unsigned char * gcm_ct, unsigned char * gcm_tag);
-
-void* spout (void *arg);
-
-void* splitter(void* arg);
-void* count(void* arg);
 int func_main(int argc, char** argv);
 

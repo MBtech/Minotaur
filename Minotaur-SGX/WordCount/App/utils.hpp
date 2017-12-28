@@ -9,8 +9,6 @@
 #define	UTILS_HPP
 
 
-
-#endif	/* UTILS_HPP */
 #include "zmq.hpp"
 #include "user_types.h"
 struct Arguments{
@@ -22,6 +20,11 @@ struct Arguments{
     std::vector<int> senderPort, receiverPort;
     std::vector<std::string> in_grouping, out_grouping; 
 };
+struct Sockets{
+       zmq::socket_t* sender;
+       zmq::socket_t* receiver;
+};
+typedef struct Sockets Sockets;
 
 long calLatency(long endtime, long endNtime, long startTime, long startNTime);
 
@@ -33,3 +36,5 @@ zmq::socket_t* key_sender_conn(Arguments * param, zmq::context_t & context, std:
 zmq::socket_t* shuffle_receiver_conn(Arguments * param, zmq::context_t & context, 
         std::vector<std::string> ip, std::vector<int> port);
 zmq::socket_t* shuffle_sender_conn(Arguments * param, zmq::context_t & context, std::string ip, int port);
+
+#endif	/* UTILS_HPP */

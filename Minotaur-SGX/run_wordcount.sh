@@ -12,7 +12,7 @@ scp countIP sgx@$IP:$dir/
 ssh $IP "cd $dir; make clean; make"
 done
 
-python deploy.py $dir 
+python deploy.py $dir $2
 
 sleep 100
 
