@@ -59,9 +59,6 @@
 #include "aesgcm.h"
 #include <msgpack.hpp>
 
-#ifdef NATIVE
-#include "Executors.hpp"
-#endif
 
 
 int func_main(int argc, char** argv);

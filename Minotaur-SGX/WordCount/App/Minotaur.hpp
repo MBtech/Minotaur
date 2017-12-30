@@ -30,21 +30,22 @@
 
 #include "TimedBuffer.hpp"
 
-#ifdef NATIVE
-#include "Executors.hpp"
-#endif
 #include <boost/algorithm/string.hpp>
 
 #ifdef NATIVE
-void* Spout (void *arg, void (*enclave_func) (char* , int* , int*, Routes*));
-#else
-void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , int* , int*, Routes*));
+#include "Enclave.h"
 #endif
 
 #ifdef NATIVE
-void* Bolt(void *arg, void (*enclave_func) (InputData* , OutputData*));
+void* Spout (void *arg, void (*enclave_func) (char* , int* , int*, Routes*, Stream*));
 #else
-void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData* , OutputData*));
+void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , int* , int*, Routes*, Stream*));
+#endif
+
+#ifdef NATIVE
+void* Bolt(void *arg, void (*enclave_func) (InputData* , OutputData*), void (*window_func)(OutputData*));
+#else
+void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData* , OutputData*), sgx_status_t (*window_func)(sgx_enclave_id_t, OutputData*));
 #endif
 
 #ifdef NATIVE

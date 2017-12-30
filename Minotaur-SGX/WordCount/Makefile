@@ -80,7 +80,7 @@ ifeq ($(BUILD), SGX)
 App_Cpp_Files := App/App.cpp $(wildcard App/Edger8rSyntax/*.cpp) $(wildcard App/TrustedLibrary/*.cpp) App/aesgcm.cpp App/utils.cpp App/TimedBuffer.cpp App/Bolts.cpp App/Minotaur.cpp
 else
 #App_Cpp_Files := App/*.cpp
-App_Cpp_Files := App/App.cpp App/aesgcm.cpp App/utils.cpp App/TimedBuffer.cpp App/Bolts.cpp App/Executors.cpp App/eutils.cpp App/Minotaur.cpp
+App_Cpp_Files := App/App.cpp App/aesgcm.cpp App/utils.cpp App/TimedBuffer.cpp App/Bolts.cpp App/Minotaur.cpp App/Enclave.cpp App/eutils.cpp
 endif
 
 App_Include_Paths := -IInclude -IApp -I$(SGX_SDK)/include 

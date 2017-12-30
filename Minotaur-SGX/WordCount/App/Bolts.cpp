@@ -108,7 +108,8 @@ int func_main(int argc, char** argv) {
     if(strcmp(argv[1], "spout")==0) {
         Spout((void*) arg, enclave_spout_execute);
     } else if (strcmp(argv[1], "splitter")==0) {
-        Bolt((void*) arg, enclave_splitter_execute);
+        arg->windowSize = 0;
+        Bolt((void*) arg, enclave_splitter_execute, dummy_window_func);
     } else if(strcmp(argv[1], "count")==0) {
         Sink((void*) arg, enclave_count_execute);
     }

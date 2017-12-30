@@ -14,6 +14,7 @@
 struct Arguments{
     const char * ip; 
     int id;
+    int windowSize;
     int next_stage;
     int prev_stage;
     std::vector<std::string> senderIP, receiverIP;

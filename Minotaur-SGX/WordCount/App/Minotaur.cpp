@@ -8,9 +8,9 @@ void encrypt(char * line, size_t len_pt, unsigned char * gcm_ct, unsigned char *
 #endif
 
 #ifdef NATIVE
-void* Spout (void *arg, void (*enclave_func) (char* , int* , int*, Routes*))
+void* Spout (void *arg, void (*enclave_func) (char* , int* , int*, Routes*, Stream*))
 #else
-void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , int* , int*, Routes*))
+void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , int* , int*, Routes*, Stream*))
 #endif
 {
     zmq::context_t * context;
@@ -26,8 +26,9 @@ void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , 
     //std::string ptsentence ("Hello is it me you are looking for?");
     std::string ptsentence;
     int j = 0;
-
-    TimedBuffer s_buff(context,socks->sender, BUFFER_TIMEOUT);
+    std::vector<zmq::socket_t*> sockets;
+    sockets.push_back(socks->sender);
+    TimedBuffer s_buff(context,sockets, BUFFER_TIMEOUT);
     sleep(10);
     while(1) {
         while(std::getline(datafile, ptsentence)) {
@@ -43,10 +44,11 @@ void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , 
 #endif
 
             Routes * routes = (Routes* ) malloc(sizeof(Routes));
+            Stream * stream = (Stream *) malloc(sizeof(Stream));
 #ifdef NATIVE
-            enclave_func((char*) ptsentence.c_str(),&n,&j, routes);
+            enclave_func((char*) ptsentence.c_str(),&n,&j, routes, stream);
 #else
-            enclave_func(global_eid,(char*) ptsentence.c_str(),&n,&j, routes);
+            enclave_func(global_eid,(char*) ptsentence.c_str(),&n,&j, routes, stream);
 #endif
             struct timespec tv;
             clock_gettime(CLOCK_REALTIME, &tv);
@@ -54,9 +56,9 @@ void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , 
                 std::cout << routes->array[0][i] << std::endl;
                 std::cout << ptsentence << "  "<<  ptsentence.length()<<std::endl;
 #ifdef SGX
-                s_buff.add_msg(routes->array[0][i], ctsentence, mac, tv.tv_sec, tv.tv_nsec);
+                s_buff.add_msg(stream->array[0], routes->array[0][i], ctsentence, mac, tv.tv_sec, tv.tv_nsec);
 #else
-                s_buff.add_msg(routes->array[0][i], ptsentence, tv.tv_sec, tv.tv_nsec);
+                s_buff.add_msg(stream->array[0], routes->array[0][i], ptsentence, tv.tv_sec, tv.tv_nsec);
 #endif
                 s_buff.check_and_send();
             }
@@ -69,16 +71,25 @@ void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , 
 }
 
 #ifdef NATIVE
-void* Bolt(void *arg, void (*enclave_func) (InputData* , OutputData*)) {
+void* Bolt(void *arg, void (*enclave_func) (InputData* , OutputData*), void(*window_func)(OutputData*)) {
 #else
-void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData* , OutputData*)) {
+void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData* , OutputData*),
+           sgx_status_t (*window_func)(sgx_enclave_id_t, OutputData*) ) {
 #endif
+    Arguments * param = (Arguments*) arg;
+    struct timespec tv;
+    clock_gettime(CLOCK_REALTIME, &tv);
+    unsigned long beginTime = tv.tv_sec;
+    unsigned long currTime = tv.tv_sec;
+
     zmq::context_t * context;
     zmq::socket_t * sender, * receiver;
     Sockets* socks = (Sockets*) malloc(sizeof(Sockets));
     int n = 0, m=0;
     zmq_init(arg, context, socks, &n, &m);
-    TimedBuffer s_buff(context,socks->sender, BUFFER_TIMEOUT);
+    std::vector<zmq::socket_t*> sockets;
+    sockets.push_back(socks->sender);
+    TimedBuffer s_buff(context,sockets, BUFFER_TIMEOUT);
     //  Process tasks forever
     while (1) {
         zmq::message_t message;
@@ -125,9 +136,9 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
             //std::cout << "Total message: " << output->total_msgs << std::endl;
             for (int k = 0; k < output->total_msgs; k++) {
 #ifdef SGX
-                s_buff.add_msg(output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), *it2, *it3);
+                s_buff.add_msg(output->stream[k],output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), *it2, *it3);
 #else
-                s_buff.add_msg(output->routes[k][0], std::string(output->message[k], output->msg_len[k]), *it2, *it3);
+                s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), *it2, *it3);
 #endif
                 s_buff.check_and_send();
             }
@@ -136,6 +147,34 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 #endif
         }
 
+        clock_gettime(CLOCK_REALTIME, &tv);
+        currTime = tv.tv_sec;
+        if(currTime-beginTime>param->windowSize) {
+            bool flag = true;
+            while(flag) {
+#ifdef NATIVE
+                window_func(output);
+#else
+                window_func(global_eid, output);
+#endif
+                //std::cout << "Total message: " << output->total_msgs << std::endl;
+                for (int k = 0; k < output->total_msgs; k++) {
+#ifdef SGX
+                    s_buff.add_msg(output->stream[k],output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), *it2, *it3);
+#else
+                    s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), *it2, *it3);
+#endif
+                    s_buff.check_and_send();
+                }
+
+                if(output->total_msgs==0) {
+                    flag = false;
+                }
+
+            }
+            beginTime = currTime;
+
+        }
     }
     return NULL;
 }
@@ -148,7 +187,7 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
 {
     zmq::context_t * context;
     zmq::socket_t * sender, * receiver;
-Sockets* socks = (Sockets*) malloc(sizeof(Sockets));
+    Sockets* socks = (Sockets*) malloc(sizeof(Sockets));
     int n = 0, m=0;
     zmq_init(arg, context, socks, &n, &m);
     std::cout << "Starting the count worker " << std::endl;

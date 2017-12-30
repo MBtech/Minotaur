@@ -49,8 +49,8 @@
 #define ROUTE_ALGO 1
 #define SLEEP 5
 //#define NATIVE
-#define SGX
-//#define NOENCRY
+//#define SGX
+#define NOENCRY
 
 struct StringArray{
     char array[MAX_WORD_LEN][MAX_WORD_IN_SENTENCE];
@@ -64,6 +64,10 @@ typedef struct MacArray MacArray;
 
 struct Routes{
         int array[MAX_WORD_IN_SENTENCE][ROUTES];
+};
+
+struct Stream{
+        int array[MAX_WORD_IN_SENTENCE];
 };
 
 struct InputData{
@@ -83,6 +87,7 @@ struct OutputData{
         uint8_t mac[MAX_WORD_IN_SENTENCE][GCM_TAG_LEN];
 #endif
         int routes[MAX_WORD_IN_SENTENCE][ROUTES];
+        int stream[MAX_WORD_IN_SENTENCE];
 };
 
 
@@ -92,6 +97,7 @@ typedef int word_len[MAX_WORD_IN_SENTENCE];
 
 
 typedef struct Routes Routes;
+typedef struct Stream Stream;
 
 typedef struct InputData InputData;
 

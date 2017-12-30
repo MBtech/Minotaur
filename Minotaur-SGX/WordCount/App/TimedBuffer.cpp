@@ -4,7 +4,7 @@
 #include "zhelpers.hpp"
 #include "user_types.h"
 
-TimedBuffer::TimedBuffer (zmq::context_t * c,zmq::socket_t* s, long timeout) {
+TimedBuffer::TimedBuffer (zmq::context_t * c, std::vector<zmq::socket_t*> s, long timeout) {
     buffer_timeout = timeout;
     context = c ;
     sender = s; 
@@ -15,18 +15,18 @@ TimedBuffer::TimedBuffer (zmq::context_t * c,zmq::socket_t* s, long timeout) {
     startMicro = startTime.tv_sec*(uint64_t)1000000+startTime.tv_usec;
 }
 
-void TimedBuffer::add_msg (int dest, std::string data, std::string gcm, long tsec, long tnsec) {
-    data_vector[dest].push_back(data);
-    gcm_vector[dest].push_back(gcm);
-    tsec_vector[dest].push_back(tsec);
-    tnsec_vector[dest].push_back(tnsec);
+void TimedBuffer::add_msg (int stream, int dest, std::string data, std::string gcm, long tsec, long tnsec) {
+    data_vector[stream][dest].push_back(data);
+    gcm_vector[stream][dest].push_back(gcm);
+    tsec_vector[stream][dest].push_back(tsec);
+    tnsec_vector[stream][dest].push_back(tnsec);
 }
 
-void TimedBuffer::add_msg (int dest, std::string data, long tsec, long tnsec) {
+void TimedBuffer::add_msg (int stream, int dest, std::string data, long tsec, long tnsec) {
     //std::cout << "Sending to: " << dest << std::endl;
-    data_vector[dest].push_back(data);
-    tsec_vector[dest].push_back(tsec);
-    tnsec_vector[dest].push_back(tnsec);
+    data_vector[stream][dest].push_back(data);
+    tsec_vector[stream][dest].push_back(tsec);
+    tnsec_vector[stream][dest].push_back(tnsec);
 }
 
 void TimedBuffer::check_and_send() {
@@ -35,12 +35,16 @@ void TimedBuffer::check_and_send() {
     unsigned long curMicro = curTime.tv_sec*(uint64_t)1000000+curTime.tv_usec;
     if(curMicro-startMicro >= buffer_timeout) {
 //    std::cout << "Time diff: " << curMicro-startMicro << std::endl;
+      map<int, map<int, std::vector<std::string>>>::iterator baseit;
+      int i=0;
+      for(baseit = data_vector.begin(); baseit != data_vector.end(); ++baseit, ++i){
         map<int, std::vector<std::string>>::iterator it, it1;
 	map<int, std::vector<long>>::iterator it2, it3;
+        int streamid = baseit->first;
 	#ifdef SGX
-	it1 = gcm_vector.begin();
+	it1 = gcm_vector[streamid].begin();
 	#endif
-        for(it = data_vector.begin(), it2=tsec_vector.begin(), it3=tnsec_vector.begin(); it != data_vector.end(); ++it, ++it2, ++it3) {
+        for(it = data_vector[streamid].begin(), it2=tsec_vector[streamid].begin(), it3=tnsec_vector[streamid].begin(); it != data_vector[streamid].end(); ++it, ++it2, ++it3) {
             Message msg;
             msg.value= it->second;
 	    #ifdef SGX
@@ -56,12 +60,13 @@ void TimedBuffer::check_and_send() {
             message->rebuild(packed.size());
             std::memcpy(message->data(), packed.data(), packed.size());
 
-            s_sendmore(*sender, std::to_string(it->first));
-            sender->send(*message);
+            s_sendmore(*(sender[streamid]), std::to_string(it->first));
+            sender[streamid]->send(*message);
 	    #ifdef SGX
 	    ++it1;
 	    #endif
         }
+	}
         startMicro = curMicro;
 
         data_vector.clear();
