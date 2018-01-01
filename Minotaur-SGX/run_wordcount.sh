@@ -9,6 +9,7 @@ scp kill.sh sgx@$IP:$dir/
 ssh $IP "sh -c 'cd $dir; ./cleanup.sh; ./kill.sh' "
 scp spoutIP sgx@$IP:$dir/
 scp countIP sgx@$IP:$dir/
+scp aggregateIP sgx@$IP:$dir/
 ssh $IP "cd $dir; make clean; make"
 done
 

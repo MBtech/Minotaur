@@ -43,13 +43,13 @@ void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , 
 #endif
 
 #ifdef NATIVE
-void* Bolt(void *arg, void (*enclave_func) (InputData* , OutputData*), void (*window_func)(OutputData*));
+void* Bolt(void *arg, void (*enclave_func) (InputData* , OutputData*), void (*window_func)(int*, OutputData*));
 #else
-void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData* , OutputData*), sgx_status_t (*window_func)(sgx_enclave_id_t, OutputData*));
+void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData* , OutputData*), sgx_status_t (*window_func)(sgx_enclave_id_t, int*n, OutputData*));
 #endif
 
 #ifdef NATIVE
-void* Sink(void *arg, void (*enclave_func) (InputData*));
+void* Sink(void *arg, void (*enclave_func) (InputData*), void (*window_func)(OutputData*));
 #else
-void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*));
+void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*), sgx_status_t (*window_func)(sgx_enclave_id_t, OutputData*));
 #endif

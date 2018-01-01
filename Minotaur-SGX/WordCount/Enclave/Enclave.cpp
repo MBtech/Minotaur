@@ -55,7 +55,8 @@ using namespace std;
  *   Invokes OCALL to display the enclave buffer to the terminal.
  */
 
-std::map <std::string, int> count_map;
+std::map <std::string, int> count_map, agg_map;
+int prev = 0;
 #ifdef SGX
 static const unsigned char gcm_key[] = {
     0xee, 0xbc, 0x1f, 0x57, 0x48, 0x7f, 0x51, 0x92, 0x1c, 0x04, 0x65, 0x66,
@@ -204,7 +205,7 @@ void enclave_splitter_execute(InputData * input, OutputData * output) {
         snprintf( str, length + 1, "%d", 1 );
         word = s[k] + " "+ std::string(str);
         free(str);
-        int* r = get_route(word, n, n,  ROUTE_ALGO, ROUTE_LEN);
+        int* r = get_route(s[k], n, n,  ROUTE_ALGO, ROUTE_LEN);
         output->stream[k] = 0;
         memcpy(output->routes[k], r, ROUTES*sizeof(int));
         free(r);
@@ -229,24 +230,34 @@ void enclave_aggregate_execute(InputData * input, OutputData * output) {
     decrypt(input->message,input->msg_len, p_dst, (char *)input->mac);
 #endif
     int count = 0;
-    // char * token = (char*)malloc(sizeof(char));
-    // token[0] = ' ';
-    // char ** s = split(p_dst, &count, (const char*)token);
-    std::vector<std::string> s = split(p_dst);
-    count = s.size();
     unsigned int j = 0;
     int i =0;
-    output->total_msgs = count;
-    for(int k = 0; k<count; k++) {
-        //int step = strlen(s[i]);
-        //word = std::string(s[i],step);
-        //i += step+1;
-        int length = snprintf( NULL, 0, "%d", 1 );
+    
+    std::vector<std::string> s = split(p_dst);
+    word = s[0];
+    int c = atoi(s[1].c_str());
+    printf("%s", word.c_str());
+    // std::string word (p_dst, p_dst+(input->msg_len));
+    if (agg_map.find(word) != agg_map.end()) {
+        agg_map[word] += c;
+    } else {
+        agg_map[word] = c;
+    }
+}
+
+void aggregate_window(int* n , OutputData * output){
+    std::map<std::string, int>::iterator it = agg_map.begin();
+    std::string word;
+    output->total_msgs = 0;
+    int k =0;
+    for(std::advance(it, prev); it!=agg_map.end() && output->total_msgs <MAX_WORD_IN_SENTENCE; ++it ){
+        output->total_msgs += 1;
+        int length = snprintf( NULL, 0, "%d", it->second);
         char* str = (char *)malloc( length + 1 );
-        snprintf( str, length + 1, "%d", 1 );
-        word = s[k] + " "+ std::string(str);
+        snprintf( str, length + 1, "%d", it->second );
+        word = it->first + " "+ std::string(str);
         free(str);
-        int* r = get_route(word, n, n,  ROUTE_ALGO, ROUTE_LEN);
+        int* r = get_route(it->first, *n, *n,  ROUTE_ALGO, ROUTE_LEN);
         memcpy(output->routes[k], r, ROUTES*sizeof(int));
         free(r);
         output->msg_len[k]  = word.length();
@@ -258,7 +269,13 @@ void enclave_aggregate_execute(InputData * input, OutputData * output) {
         memcpy(output->mac[k], ret_tag, 16);
 #endif
         memcpy(output->message[k], gcm_ct, output->msg_len[k]);
-    }
+        k+=1;
+      }
+     prev += output->total_msgs;
+    if(it==agg_map.end()){
+        prev  = 0;
+        agg_map.clear();
+     }
 }
 
 void enclave_count_execute(InputData * input) {
@@ -279,11 +296,13 @@ void enclave_count_execute(InputData * input) {
         count_map[word] = c;
     }
     std::map<std::string, int > ::iterator it;
+/*
     #ifdef NATIVE
     printf("%s\n",word.c_str());
     #else
     printf(word.c_str());
     #endif
+*/
     // Printing the counts
     /*
     for (it = count_map.begin(); it != count_map.end(); it++) {
@@ -294,6 +313,16 @@ void enclave_count_execute(InputData * input) {
     }*/
 }
 
-void dummy_window_func(OutputData* output){
+void dummy_window_func(int *n , OutputData* output){
   output->total_msgs = 0;
+}
+
+void count_window(OutputData * output){
+    std::map<std::string, int > ::iterator it;
+    // Printing the counts
+    
+    for (it = count_map.begin(); it != count_map.end(); it++) {
+        printf("%s : %d", it->first.c_str(), it->second);
+    }
+    count_map.clear();
 }

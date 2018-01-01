@@ -32,6 +32,8 @@ void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , 
     sleep(10);
     while(1) {
         while(std::getline(datafile, ptsentence)) {
+            struct timespec tv;
+            clock_gettime(CLOCK_REALTIME, &tv);
             boost::trim(ptsentence);
             //ptsentence = "Hark. They are speaking";
 #ifdef SGX
@@ -50,8 +52,6 @@ void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , 
 #else
             enclave_func(global_eid,(char*) ptsentence.c_str(),&n,&j, routes, stream);
 #endif
-            struct timespec tv;
-            clock_gettime(CLOCK_REALTIME, &tv);
             for(int i=0; i<ROUTES; i++) {
                 std::cout << routes->array[0][i] << std::endl;
                 std::cout << ptsentence << "  "<<  ptsentence.length()<<std::endl;
@@ -71,10 +71,10 @@ void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , 
 }
 
 #ifdef NATIVE
-void* Bolt(void *arg, void (*enclave_func) (InputData* , OutputData*), void(*window_func)(OutputData*)) {
+void* Bolt(void *arg, void (*enclave_func) (InputData* , OutputData*), void(*window_func)(int *, OutputData*)) {
 #else
 void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData* , OutputData*),
-           sgx_status_t (*window_func)(sgx_enclave_id_t, OutputData*) ) {
+           sgx_status_t (*window_func)(sgx_enclave_id_t, int*n, OutputData*) ) {
 #endif
     Arguments * param = (Arguments*) arg;
     struct timespec tv;
@@ -104,6 +104,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 
         msgpack::object obj = oh.get();
         obj.convert(msg);
+
         std::vector<long> timeNSec = msg.timeNSec;
         std::vector<long> timeSec = msg.timeSec;
 
@@ -121,6 +122,10 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
         it1 = mac_buffer.begin();
 #endif
         for(it = msg_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); it != msg_buffer.end(); ++it, ++it2, ++it3) {
+            clock_gettime(CLOCK_REALTIME, &tv);
+            long latency = calLatency(tv.tv_sec, tv.tv_nsec, *it2, *it3);
+            std::cout << "Network Latency: " << latency<<std::endl;
+
             std::string val = *it;
             input->msg_len = val.length();
             std::copy(val.begin(), val.end(), input->message);
@@ -136,12 +141,18 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
             //std::cout << "Total message: " << output->total_msgs << std::endl;
             for (int k = 0; k < output->total_msgs; k++) {
 #ifdef SGX
-                s_buff.add_msg(output->stream[k],output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), *it2, *it3);
+                s_buff.add_msg(output->stream[k],output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
 #else
-                s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), *it2, *it3);
+                s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
 #endif
                 s_buff.check_and_send();
             }
+            if(output->total_msgs ==0){
+		struct timespec t; 
+clock_gettime(CLOCK_REALTIME, &t);
+	                    long latency = calLatency(t.tv_sec, t.tv_nsec, tv.tv_sec, tv.tv_nsec);
+            std::cout << "Processing Latency: " << latency<<std::endl;
+	}
 #ifdef SGX
             ++it1;
 #endif
@@ -151,18 +162,19 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
         currTime = tv.tv_sec;
         if(currTime-beginTime>param->windowSize) {
             bool flag = true;
+            int parallel = param->next_stage;
             while(flag) {
 #ifdef NATIVE
-                window_func(output);
+                window_func(&parallel, output);
 #else
-                window_func(global_eid, output);
+                window_func(global_eid, &parallel, output);
 #endif
                 //std::cout << "Total message: " << output->total_msgs << std::endl;
                 for (int k = 0; k < output->total_msgs; k++) {
 #ifdef SGX
-                    s_buff.add_msg(output->stream[k],output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), *it2, *it3);
+                    s_buff.add_msg(output->stream[k],output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
 #else
-                    s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), *it2, *it3);
+                    s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
 #endif
                     s_buff.check_and_send();
                 }
@@ -172,6 +184,10 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
                 }
 
             }
+	    struct timespec t;
+            clock_gettime(CLOCK_REALTIME, &t);
+                            long latency = calLatency(t.tv_sec, t.tv_nsec, tv.tv_sec, tv.tv_nsec);
+            std::cout << "Window Latency: " << latency<<std::endl;
             beginTime = currTime;
 
         }
@@ -180,11 +196,17 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 }
 
 #ifdef NATIVE
-void* Sink(void *arg, void (*enclave_func) (InputData*))
+void* Sink(void *arg, void (*enclave_func) (InputData*), void (*window_func)(OutputData*))
 #else
-void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*))
+void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*), sgx_status_t (*window_func)(sgx_enclave_id_t, OutputData*))
 #endif
 {
+    Arguments * param = (Arguments*) arg;
+    struct timespec tv;
+    clock_gettime(CLOCK_REALTIME, &tv);
+    unsigned long beginTime = tv.tv_sec;
+    unsigned long currTime = tv.tv_sec;
+
     zmq::context_t * context;
     zmq::socket_t * sender, * receiver;
     Sockets* socks = (Sockets*) malloc(sizeof(Sockets));
@@ -206,6 +228,7 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
         std::vector<long> timeNSec = msg.timeNSec;
         std::vector<long> timeSec = msg.timeSec;
 
+        OutputData * output = (OutputData* ) malloc(sizeof(OutputData));
         std::vector<std::string> msg_buffer = msg.value;
         char ct[100];
 #ifdef SGX
@@ -222,6 +245,10 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
 //        OutputData * output = (OutputData* ) malloc(sizeof(OutputData));
 
         for(it = msg_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); it != msg_buffer.end(); ++it, ++it2, ++it3) {
+            clock_gettime(CLOCK_REALTIME, &tv);
+            long latency = calLatency(tv.tv_sec, tv.tv_nsec, *it2, *it3);
+            std::cout << "Network Latency: " << latency<<std::endl;
+
             std::string m = *it;
             input->msg_len = m.length();
             std::copy(m.begin(), m.end(), input->message);
@@ -239,11 +266,26 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
             struct timespec tv;
             clock_gettime(CLOCK_REALTIME, &tv);
 
-            long latency = calLatency(tv.tv_sec, tv.tv_nsec, *it2, *it3);
-            std::cout << "Latency: " << latency<<std::endl;
+            latency = calLatency(tv.tv_sec, tv.tv_nsec, *it2, *it3);
+            std::cout << "Processing Latency: " << latency<<std::endl;
 #ifdef SGX
             ++it1;
 #endif
+        }
+
+        // If we have windows
+        clock_gettime(CLOCK_REALTIME, &tv);
+        currTime = tv.tv_sec;
+
+        if(currTime-beginTime>param->windowSize) {
+            std::cout << "Printing the map" << std::endl;
+#ifdef NATIVE
+            window_func(output);
+#else
+            window_func(global_eid, output);
+#endif
+            beginTime = currTime;
+
         }
     }
     return NULL;

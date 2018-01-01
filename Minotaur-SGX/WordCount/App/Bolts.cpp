@@ -38,18 +38,31 @@ int func_main(int argc, char** argv) {
 
     parallelism["spout"]  = 2;
     parallelism["splitter"]  = 4;
-    parallelism["count"]  = 6;
+    parallelism["count"]  = 1;
+    if(ROUTE_ALGO==4)
+        parallelism["aggregate"] = 6;
 
     std::map<std::string, std::map<std::string, std::vector<std::string>>> topo, grouping;
     topo["spout"]["children"].push_back("splitter");
     topo["splitter"]["parents"].push_back("spout");
-    topo["splitter"]["children"].push_back("count");
-    topo["count"]["parents"].push_back("splitter");
+    if(ROUTE_ALGO==4) {
+        topo["aggregate"]["children"].push_back("count");
+        topo["aggregate"]["parents"].push_back("splitter");
+        topo["count"]["parents"].push_back("aggregate");
+        topo["splitter"]["children"].push_back("aggregate");
+    } else {
+        topo["count"]["parents"].push_back("splitter");
+        topo["splitter"]["children"].push_back("count");
+    }
 
     grouping["spout"]["out"].push_back("shuffle");
     grouping["splitter"]["in"].push_back("shuffle");
     grouping["splitter"]["out"].push_back("key");
     grouping["count"]["in"].push_back("key");
+    if(ROUTE_ALGO==4){
+	grouping["aggregate"]["in"].push_back("key");
+	grouping["aggregate"]["out"].push_back("key");
+    }
 
 // TODO: Adapt this code to work for multiple output stages
     Arguments * arg = new Arguments;
@@ -70,7 +83,7 @@ int func_main(int argc, char** argv) {
     std::vector<std::string> senderIP, receiverIP;
     std::vector<int> senderPort, receiverPort;
     if(grouping[argv[1]]["in"].size()>0) {
-	if(grouping[argv[1]]["in"].back() =="key" ) {
+        if(grouping[argv[1]]["in"].back() =="key" ) {
             receiverPort.push_back(atoi(argv[4]));
             receiverIP.push_back(std::string(argv[3]));
         } else {
@@ -111,8 +124,12 @@ int func_main(int argc, char** argv) {
         arg->windowSize = 0;
         Bolt((void*) arg, enclave_splitter_execute, dummy_window_func);
     } else if(strcmp(argv[1], "count")==0) {
-        Sink((void*) arg, enclave_count_execute);
-    }
+        arg->windowSize=10;
+        Sink((void*) arg, enclave_count_execute, count_window);
+    }else{
+	arg->windowSize=10;
+	Bolt((void*) arg, enclave_aggregate_execute, aggregate_window);
+	}
 
     return 0;
 }

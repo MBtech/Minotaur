@@ -33,6 +33,7 @@ void TimedBuffer::check_and_send() {
     timeval curTime;
     gettimeofday(&curTime, NULL);
     unsigned long curMicro = curTime.tv_sec*(uint64_t)1000000+curTime.tv_usec;
+    struct timespec tv;
     if(curMicro-startMicro >= buffer_timeout) {
 //    std::cout << "Time diff: " << curMicro-startMicro << std::endl;
       map<int, map<int, std::vector<std::string>>>::iterator baseit;
@@ -51,8 +52,11 @@ void TimedBuffer::check_and_send() {
             msg.gcm_tag = it1->second;
 	    #endif
 
-            msg.timeNSec = it2->second;
-            msg.timeSec = it3->second;
+            clock_gettime(CLOCK_REALTIME, &tv);
+            std::vector<long> vec(it2->second.size(), tv.tv_sec);
+            msg.timeSec = vec;
+            std::vector<long> vec1(it3->second.size(), tv.tv_nsec);
+            msg.timeNSec = vec1;
 
             msgpack::sbuffer packed;
             msgpack::pack(&packed, msg);
@@ -65,6 +69,11 @@ void TimedBuffer::check_and_send() {
 	    #ifdef SGX
 	    ++it1;
 	    #endif
+
+            for(int i=0; i<it2->second.size(); i++){
+            long latency = calLatency(tv.tv_sec, tv.tv_nsec, it2->second[i], it3->second[i]);
+            std::cout << "Buffer Latency: " << latency<<std::endl;
+   		}
         }
 	}
         startMicro = curMicro;

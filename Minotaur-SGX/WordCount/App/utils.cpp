@@ -6,7 +6,9 @@
 
 long calLatency(long endTime, long endNTime, long startTime, long startNTime) {
     long lat = 0;
-    double temp  = ((double)endTime + 1.0e-9*endNTime) - ((double)startTime + 1.0e-9*startNTime);
+//    lat = endTime - startTime; 
+    double temp = 0.0;
+    temp  = ((double)endTime + 1.0e-9*endNTime) - ((double)startTime + 1.0e-9*startNTime);
     lat = temp * 1.0e6;
     return lat;
 }
