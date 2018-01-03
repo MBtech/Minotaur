@@ -22,7 +22,7 @@ void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , 
     //  Initialize random number generator
     srandom ((unsigned) time (NULL));
 
-    std::ifstream datafile("book");
+    std::ifstream datafile("nyc-taxi.csv");
     //std::string ptsentence ("Hello is it me you are looking for?");
     std::string ptsentence;
     int j = 0;

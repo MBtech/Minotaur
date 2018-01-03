@@ -1,0 +1,20 @@
+{
+    "servers":[
+              "192.168.10.1", "192.168.10.2"
+     ],
+     
+     "components": ["spout", "splitter","aggregate", "count"],
+     "ports" : {
+    	"spout": "5000",
+        "splitter": "",
+        "aggregate": "7000",
+	"count": "6000"
+      },
+     "parallelism": {
+        "spout": "2",
+        "splitter": "4",
+        "aggregate": "6",
+        "count": "1"
+      }
+   
+}
