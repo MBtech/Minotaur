@@ -4,11 +4,6 @@
      ],
      
      "components": ["spout", "splitter", "count"],
-     "ports" : {
-    	"spout": "5000",
-        "splitter": "",
-	"count": "6000"
-      },
      "parallelism": {
         "spout": "2",
         "splitter": "4",

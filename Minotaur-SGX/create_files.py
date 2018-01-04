@@ -1,9 +1,7 @@
-import paramiko
 import sys
 import json
 
-parent_directory = sys.argv[1]
-f= sys.argv[2]
+f= sys.argv[1]
 data = json.load(open(f))
 servers=data["servers"]
 components =data["components"]
@@ -15,16 +13,13 @@ for c in components:
     k +=1
 
 parallelism = data["parallelism"]
-ssh = paramiko.SSHClient()
-ssh.load_system_host_keys()
 
 for component in components:
     j = 0
+    fd = open(component+"IP", "w")
     for server in servers:
-        ssh.connect(server)
         for i in range(j, int(parallelism[component]), len(servers)):
-            cmd = "cd " + parent_directory+ "; nohup ./app " + component+" " + str(i) + " " + server+ " " + ports[component] + " > " + component+"log"+str(i)+ " 2>&1 &" 
-            print cmd 
-            ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(cmd)
+            fd.write(server + " " + str(int(ports[component])+i)+"\n")
         j+=1 
+    fd.close()
             

@@ -4,12 +4,6 @@
      ],
      
      "components": ["spout", "splitter","aggregate", "count"],
-     "ports" : {
-    	"spout": "5000",
-        "splitter": "",
-        "aggregate": "7000",
-	"count": "6000"
-      },
      "parallelism": {
         "spout": "2",
         "splitter": "4",

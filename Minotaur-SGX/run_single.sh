@@ -3,6 +3,11 @@ dir=~/bilal/Minotaur/Minotaur-SGX/$1
 
 IPs=(192.168.10.1 192.168.10.2)
 
+cp $dir/Enclave/Enclave.cpp $dir/App/Enclave.cpp
+cp $dir/Enclave/Enclave.h $dir/App/Enclave.h
+
+python create_files.py $2
+
 for IP in ${IPs[@]}
 do
 scp kill.sh sgx@$IP:$dir/

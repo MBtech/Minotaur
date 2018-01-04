@@ -4,13 +4,6 @@
      ],
      
      "components": ["spout", "filter","aggregate", "count", "final"],
-     "ports" : {
-    	"spout": "5000",
-        "filter": "",
-        "aggregate": "7000",
-	"count": "6000",
-        "final": "8000"
-      },
      "parallelism": {
         "spout": "2",
         "filter": "4",

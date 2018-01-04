@@ -49,7 +49,10 @@ void printf(const char *fmt, ...);
 void enclave_spout_execute(char* csmessage,  int* n, int *j, Routes* routes, Stream * stream);
 void enclave_splitter_execute(InputData * input, OutputData * output);
 void enclave_count_execute(InputData * input);
-void dummy_window_func(OutputData * output);
+void dummy_window_func(int *n , OutputData * output);
+void enclave_aggregate_execute(InputData * input, OutputData * output);
+void count_window(OutputData * output);
+void aggregate_window(int *n, OutputData * output);
 #endif
 
 #if defined(__cplusplus)
