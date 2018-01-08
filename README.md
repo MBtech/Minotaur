@@ -25,3 +25,5 @@ sudo make install
 
 ## Or run the setup script
 ./setup.sh
+
+**Note:** See the README.md in the Minotaur-SGX directory for information on how to run the example applications. 
