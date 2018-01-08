@@ -23,7 +23,7 @@ for component in components:
     for server in servers:
         ssh.connect(server)
         for i in range(j, int(parallelism[component]), len(servers)):
-            cmd = "cd " + parent_directory+ "; nohup ./app " + component+" " + str(i) + " " + server+ " " + ports[component] + " > " + component+"log"+str(i)+ " 2>&1 &" 
+            cmd = "cd " + parent_directory+ "; nohup ./app " + component+" " + str(i) + " " + server+ " " + ports[component] +" "+ server +" "+ ports[components[(components.index(component)+1)%len(components)]] + " > " + component+"log"+str(i)+ " 2>&1 &" 
             print cmd 
             ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(cmd)
         j+=1 

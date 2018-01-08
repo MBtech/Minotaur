@@ -1,0 +1,14 @@
+{
+    "servers":[
+              "192.168.10.1", "192.168.10.2"
+     ],
+     
+     "components": ["spout", "ma","aggregate", "spike"],
+     "parallelism": {
+        "spout": "2",
+        "ma": "4",
+        "aggregate": "2",
+        "spike": "2"
+      }
+   
+}

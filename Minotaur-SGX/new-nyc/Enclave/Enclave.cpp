@@ -223,9 +223,9 @@ void enclave_filter_execute(InputData * input, OutputData * output) {
     snprintf( str, length + 1, "%d", 1 );
 
     word = s[18]+ "," +s[4]+ "," +s[16]+ "," +s[17];
-    free(str);
     int* r = get_route(word, n, n,  ROUTE_ALGO, ROUTE_LEN);
     word = word + " " + std::string(str);
+    free(str);
     output->stream[k] = 0;
     memcpy(output->routes[k], r, ROUTES*sizeof(int));
     free(r);

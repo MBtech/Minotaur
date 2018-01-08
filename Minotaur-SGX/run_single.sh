@@ -5,6 +5,7 @@ IPs=(192.168.10.1 192.168.10.2)
 
 cp $dir/Enclave/Enclave.cpp $dir/App/Enclave.cpp
 cp $dir/Enclave/Enclave.h $dir/App/Enclave.h
+scp -r $dir 192.168.10.1:~/bilal/Minotaur/Minotaur-SGX/
 
 python create_files.py $2
 
