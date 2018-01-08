@@ -1,16 +1,30 @@
 ## Setup
-IP addresses and port tuples for Spout and Count bolts should be written in files named `spoutIP` and `countIP` respectively. Examples are availabe in the preexisting files. 
+You can setup Intel SGX development and execution environment using the ansible playbook available at [ansible-sgx repo](https://github.com/mbtech/ansible-sgx.git). 
+
+## Library
+The work on the library is underprogress
+
+## Applications
+There are currently three SGX based streaming applications available 
+1. Rolling Word count
+2. New york taxi routes application
+3. Spike Detection application
 
 ## Usage
-Run spout using
-    ./app spout <spout_id> <spoutIP> <spoutPort>  
+Information about the topologies can be specified using the json file. See the examples such as `wordcount.json` and `spike_agg.json`
 
-Run split bolt using
-    ./app splitter <split_id>
+The application can be executed using the following command:
+```
+./run_tests.sh <App_Dir> run_single.sh <json_file> <App_version>
+```
 
-Run count bolt using
+App Dir refers to the directory where the stream application exists
+Json file is the path to the json file that provides the configurable information about the application
+App version is used to specify whether to run the application in `SGX`, `NATIVE` or `NOENCRYPT` modes.
 
-    ./app count <count_id> <countIP> <countPort>
+Here is an example 
+```
+./run_tests.sh WordCount run_single.sh wordcount_agg.json SGX
+```
 
-
-Example usage can be seen in the `rundistributed.sh` script
+Note that the json file that have `_agg` are the ones that specify topology information when we decide to use the power of n choice algorithm 
