@@ -31,39 +31,29 @@
 
 #include "Bolts.hpp"
 #include "Minotaur.hpp"
+#include "json.hpp"
 
+using json = nlohmann::json; 
 
 int func_main(int argc, char** argv) {
-    std::map<std::string, int> parallelism;
 
-    parallelism["spout"]  = 2;
-    parallelism["splitter"]  = 4;
-    parallelism["count"]  = 1;
-    if(ROUTE_ALGO==4)
-        parallelism["aggregate"] = 6;
+    //std::map<std::string, int> parallelism;
+    std::ifstream i("../wordcount.json");
+    json j;
+    i >> j;
 
+    std::map<std::string, int> parallelism = j["parallelism"];
     std::map<std::string, std::map<std::string, std::vector<std::string>>> topo, grouping;
-    topo["spout"]["children"].push_back("splitter");
-    topo["splitter"]["parents"].push_back("spout");
-    if(ROUTE_ALGO==4) {
-        topo["aggregate"]["children"].push_back("count");
-        topo["aggregate"]["parents"].push_back("splitter");
-        topo["count"]["parents"].push_back("aggregate");
-        topo["splitter"]["children"].push_back("aggregate");
-    } else {
-        topo["count"]["parents"].push_back("splitter");
-        topo["splitter"]["children"].push_back("count");
-    }
-
-    grouping["spout"]["out"].push_back("shuffle");
-    grouping["splitter"]["in"].push_back("shuffle");
-    grouping["splitter"]["out"].push_back("key");
-    grouping["count"]["in"].push_back("key");
-    if(ROUTE_ALGO==4){
-	grouping["aggregate"]["in"].push_back("key");
-	grouping["aggregate"]["out"].push_back("key");
-    }
-
+    std::map<std::string, std::vector<std::string>> topology= j["topology"];
+    std::vector<std::string> components = j["components"];
+    for(int i =0; i<components.size()-1; i++){ 
+          std::cout << (topology[components[i]][1]) << std::endl;
+          grouping[components[i]]["out"].push_back(topology[components[i]][1]);
+          grouping[topology[components[i]][0]]["in"].push_back(topology[components[i]][1]);
+          topo[components[i]]["children"].push_back(topology[components[i]][0]);
+          topo[topology[components[i]][0]]["parents"].push_back(components[i]);
+          
+	}
 // TODO: Adapt this code to work for multiple output stages
     Arguments * arg = new Arguments;
     arg->id = atoi(argv[2]);
@@ -117,20 +107,22 @@ int func_main(int argc, char** argv) {
     arg -> receiverIP = receiverIP;
     arg -> senderPort = senderPort;
     arg-> receiverPort = receiverPort;
-
+    std::string file = "book";
     if(strcmp(argv[1], "spout")==0) {
-        Spout((void*) arg, enclave_spout_execute);
+        Spout((void*) arg,file, enclave_spout_execute);
     } else if (strcmp(argv[1], "splitter")==0) {
         arg->windowSize = 0;
         Bolt((void*) arg, enclave_splitter_execute, dummy_window_func);
     } else if(strcmp(argv[1], "count")==0) {
         arg->windowSize=10;
         Sink((void*) arg, enclave_count_execute, count_window);
-    }else{
+    }
+    else{
 	arg->windowSize=10;
 	Bolt((void*) arg, enclave_aggregate_execute, aggregate_window);
 	}
 
     return 0;
+
 }
 

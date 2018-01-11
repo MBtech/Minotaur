@@ -8,9 +8,9 @@ void encrypt(char * line, size_t len_pt, unsigned char * gcm_ct, unsigned char *
 #endif
 
 #ifdef NATIVE
-void* Spout (void *arg, void (*enclave_func) (char* , int* , int*, Routes*, Stream*))
+void* Spout (void *arg, std::string file, void (*enclave_func) (char* , int* , int*, Routes*, Stream*))
 #else
-void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , int* , int*, Routes*, Stream*))
+void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , int* , int*, Routes*, Stream*))
 #endif
 {
     zmq::context_t * context;
@@ -22,7 +22,7 @@ void* Spout (void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , 
     //  Initialize random number generator
     srandom ((unsigned) time (NULL));
 
-    std::ifstream datafile("book");
+    std::ifstream datafile(file);
     //std::string ptsentence ("Hello is it me you are looking for?");
     std::string ptsentence;
     int j = 0;
@@ -128,6 +128,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 
             std::string val = *it;
             input->msg_len = val.length();
+	    input->source = param->id;
             std::copy(val.begin(), val.end(), input->message);
 #ifdef SGX
             std::string tag = *it1;

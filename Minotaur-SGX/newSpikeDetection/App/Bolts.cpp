@@ -120,8 +120,10 @@ int func_main(int argc, char** argv) {
     arg -> senderPort = senderPort;
     arg-> receiverPort = receiverPort;
 
+    std::string file = "sensor_full.dat";
+
     if(strcmp(argv[1], "spout")==0) {
-        Spout((void*) arg, enclave_spout_execute);
+        Spout((void*) arg, file, enclave_spout_execute);
     } else if (strcmp(argv[1], "ma")==0) {
         arg->windowSize = 0;
         Bolt((void*) arg, enclave_ma_execute, dummy_window_func);

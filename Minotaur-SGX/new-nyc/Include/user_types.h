@@ -77,6 +77,7 @@ struct InputData{
         uint8_t mac[GCM_TAG_LEN];
 #endif
         int next_parallel;
+	int source;
 };
 
 struct OutputData{

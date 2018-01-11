@@ -1,3 +1,2 @@
-- Create a way to specify the topology in json or something
 - Fix the issues where in port at key and output at shuffle creates issues (the problem lies in the way IP files are generated)
 - Create the IoT app

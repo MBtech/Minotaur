@@ -2,6 +2,10 @@
     "servers":[
               "192.168.10.1", "192.168.10.2"
      ],
+     "topology":{
+ 	"spout" : ["splitter", "shuffle"],
+        "splitter" : ["count", "key"]
+     },
      
      "components": ["spout", "splitter", "count"],
      "parallelism": {
