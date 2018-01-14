@@ -1,0 +1,20 @@
+{
+    "servers":[
+              "192.168.10.1", "192.168.10.2"
+     ],
+     "topology":{
+ 	"spout" : ["vf", "shuffle"],
+        "vf" : ["af", "shuffle", "emerg", "shuffle"],
+	"af" : ["others", "shuffle", "emerg", "shuffle"]
+     },
+     
+     "components": ["spout", "vf", "af", "emerg", "others"],
+     "parallelism": {
+        "spout": "2",
+        "af": "4",
+        "vf": "4",
+	"emerg" : "2",
+	"others" : "1"
+      }
+   
+}

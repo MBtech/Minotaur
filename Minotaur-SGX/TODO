@@ -1,2 +1,3 @@
 - Fix the issues where in port at key and output at shuffle creates issues (the problem lies in the way IP files are generated)
 - Create the IoT app
+- Modify the framework so it works with two different bolts as input to a stage
