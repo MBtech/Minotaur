@@ -26,10 +26,10 @@ void zmq_init(void * arg, zmq::context_t* context,Sockets* socks,  std::vector<i
             if(param->out_grouping[i] == "shuffle") {
                 std::cout << "Setting up shuffle sender " << std::endl;
                 //std::cout << senderIP[0] << " " << senderPort[0] << std::endl;
-                socks->sender.push_back(shuffle_sender_conn(param, *context, senderIP[i][0], senderPort[i][0]));
+                shuffle_sender_conn(param, *context, senderIP[i][param->id], senderPort[i][param->id], socks->sender);
             } else if(param->out_grouping[i] == "key") {
                 std::cout << "Setting up key sender " << std::endl;
-                socks->sender.push_back(key_sender_conn(param, *context, senderIP[i], senderPort[i]));
+                key_sender_conn(param, *context, senderIP[i], senderPort[i], socks->sender);
             }
         }
     }
@@ -39,7 +39,7 @@ void zmq_init(void * arg, zmq::context_t* context,Sockets* socks,  std::vector<i
             socks->receiver = shuffle_receiver_conn(param, *context, receiverIP[0], receiverPort[0]);
         } else if(param->in_grouping.back() == "key") {
             std::cout << "Setting up key receiver " << std::endl;
-            socks->receiver = key_receiver_conn(param, *context, receiverIP[0][0], receiverPort[0][0]);
+            socks->receiver = key_receiver_conn(param, *context, receiverIP[0][param->id], receiverPort[0][param->id]);
         }
     }
     *back = param->prev_stage;
@@ -58,25 +58,26 @@ zmq::socket_t* key_receiver_conn(Arguments * param, zmq::context_t & context, st
 }
 
 // Function to setup connection for a sender endpoint of a key based grouping
-zmq::socket_t* key_sender_conn(Arguments * param, zmq::context_t & context,
-                               std::vector<std::string> ip, std::vector<int> port) {
+std::vector<zmq::socket_t*> key_sender_conn(Arguments * param, zmq::context_t & context,
+                               std::vector<std::string> ip, std::vector<int> port,std::vector<zmq::socket_t* >&v) {
     //  Socket to send messages to
-    zmq::socket_t* sender = new zmq::socket_t(context, ZMQ_PUB);
+    v.push_back(new zmq::socket_t(context, ZMQ_PUB));
     for (int i = 0; i<port.size(); i++) {
-        sender->connect("tcp://"+ip[i]+":"+std::to_string(port[i]));
+        v.back()->connect("tcp://"+ip[i]+":"+std::to_string(port[i]));
         std::cout << "Connecting to port " << port[i] << " IP "<< ip[i] << std::endl;
     }
-    return sender;
+    return v;
 }
 
 // Function to setup connection for a sender endpoint of a shuffle based grouping
-zmq::socket_t* shuffle_sender_conn(Arguments * param, zmq::context_t & context, std::string ip, int port) {
+std::vector<zmq::socket_t*> shuffle_sender_conn(Arguments * param, zmq::context_t & context, std::string ip, int port, std::vector<zmq::socket_t *>& v) {
     //  Socket to send messages on
-    zmq::socket_t*  sender = new zmq::socket_t(context, ZMQ_PUB);
+    zmq::socket_t * sender = new zmq::socket_t(context, ZMQ_PUB);
     //std::cout << "Binding to " << "tcp://127.0.0.1:"+std::to_string(5000+param->id) << std::endl;
     std::cout << "Connecting to port " << port+param->id << " IP "<< ip << std::endl;
     sender->bind("tcp://"+ip+":"+std::to_string(port+param->id));
-    return sender;
+    v.push_back(sender);
+    return v;
 }
 
 // Function to setup connection for a receiver endpoint of a shuffle based grouping

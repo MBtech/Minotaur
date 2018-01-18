@@ -75,11 +75,12 @@ int func_main(int argc, char** argv) {
     std::vector<std::vector<int>> receiverPort(1), senderPort(grouping[argv[1]]["out"].size());
 
     if(grouping[argv[1]]["in"].size()>0) {
-        if(grouping[argv[1]]["in"].back() =="key" ) {
+/*        if(grouping[argv[1]]["in"].back() =="key" ) {
             receiverPort[0].push_back(atoi(argv[4]));
             receiverIP[0].push_back(std::string(argv[3]));
         } else {
-            std::string filename = topo[argv[1]]["parents"].back() + "IP";
+*/
+            std::string filename = std::string(argv[1])+ "_in_0" + "_IP";
             std::ifstream receiverfile(filename);
             std::string ip, port;
             while(receiverfile >> ip>>port) {
@@ -87,15 +88,16 @@ int func_main(int argc, char** argv) {
                 receiverPort[0].push_back(stoi(port));
                 std::cout << ip << " " << port << std::endl;
             }
-        }
+//        }
     }
     if(grouping[argv[1]]["out"].size()>0) {
         for(int i=0; i<grouping[argv[1]]["out"].size(); i++) {
-            if(grouping[argv[1]]["out"][i] == "shuffle" ) {
-                senderPort[i].push_back(atoi(argv[4]));
-                senderIP[i].push_back(std::string(argv[3]));
+/*            if(grouping[argv[1]]["out"][i] == "shuffle" ) {
+                senderPort[i].push_back(atoi(argv[4+(2*i)]));
+                senderIP[i].push_back(std::string(argv[3+(2*i)]));
             } else {
-                std::string filename = topo[argv[1]]["children"].back() + "IP";
+*/
+                std::string filename = std::string(argv[1])+ "_out_" + std::to_string(i) + "_IP";
                 std::ifstream senderfile(filename);
                 std::string ip, port;
                 while(senderfile >> ip>>port) {
@@ -103,7 +105,7 @@ int func_main(int argc, char** argv) {
                     senderPort[i].push_back(stoi(port));
                     std::cout << ip << " " << port << std::endl;
                 }
-            }
+//            }
         }
     }
 
@@ -125,7 +127,11 @@ int func_main(int argc, char** argv) {
         arg->windowSize=0;
         Sink((void*) arg, enclave_emerg_execute, dummy_window_sink);
     }
-    else if(strcmp(argv[1], "others")==0) {
+    else if(strcmp(argv[1], "emerg1")==0) {
+        arg->windowSize=0;
+        Sink((void*) arg, enclave_emerg_execute, dummy_window_sink);
+    }
+    else if(strcmp(argv[1], "other")==0) {
         arg->windowSize=0;
         Sink((void*) arg, enclave_other_execute, dummy_window_sink);
     }

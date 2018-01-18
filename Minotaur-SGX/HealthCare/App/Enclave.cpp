@@ -170,7 +170,7 @@ std::vector<int> split(const char * str, char c= ' ') {
 void enclave_spout_execute(char* csmessage, Parallelism * n, Routes* routes, Stream * stream) {
     //std::vector<std::string> s = split(csmessage);
     stream->array[0] = 0;
-   
+    printf(csmessage);   
     int * r = get_route(csmessage,n->next_parallel[stream->array[0]],0,1);
     //std::copy(r.begin(), r.end(), routes->array[0]);
     memcpy(routes->array[0], r,1*sizeof(int));

@@ -33,9 +33,11 @@ void zmq_init(void * arg, zmq::context_t* context, Sockets* socks, std::vector<i
 
 zmq::socket_t* key_receiver_conn(Arguments * param, zmq::context_t & context, std::string ip, int port);
 
-zmq::socket_t* key_sender_conn(Arguments * param, zmq::context_t & context, std::vector<std::string> ip, std::vector<int> port);
+std::vector<zmq::socket_t*> key_sender_conn(Arguments * param, zmq::context_t & context,
+                               std::vector<std::string> ip, std::vector<int> port,std::vector<zmq::socket_t* >&v);
+
 zmq::socket_t* shuffle_receiver_conn(Arguments * param, zmq::context_t & context, 
         std::vector<std::string> ip, std::vector<int> port);
-zmq::socket_t* shuffle_sender_conn(Arguments * param, zmq::context_t & context, std::string ip, int port);
+std::vector<zmq::socket_t*> shuffle_sender_conn(Arguments * param, zmq::context_t & context, std::string ip, int port, std::vector<zmq::socket_t* > &v);
 
 #endif	/* UTILS_HPP */
