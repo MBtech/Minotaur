@@ -13,7 +13,6 @@ for component in components:
     if(component not in data["topology"]):    
         continue
     child = data["topology"][component]
-    j = 0
     k = 0
     for c in range(0, len(child), 2):
         filename_out = component+"_out_"+str(k)+"_IP"
@@ -21,6 +20,7 @@ for component in components:
         fd = open(filename_out, "w")
 	fd1 = open(filename_in, "w")
 	count = 0
+        j = 0
         for server in servers:
           
             for i in range(j, int(parallelism[component]), len(servers)):

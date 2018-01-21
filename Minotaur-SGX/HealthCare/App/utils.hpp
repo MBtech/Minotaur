@@ -22,7 +22,7 @@ struct Arguments{
     std::vector<std::string> in_grouping, out_grouping; 
 };
 struct Sockets{
-       std::vector<zmq::socket_t*> sender;
+       zmq::socket_t* sender[2];
        zmq::socket_t* receiver;
 };
 typedef struct Sockets Sockets;
@@ -33,11 +33,11 @@ void zmq_init(void * arg, zmq::context_t* context, Sockets* socks, std::vector<i
 
 zmq::socket_t* key_receiver_conn(Arguments * param, zmq::context_t & context, std::string ip, int port);
 
-std::vector<zmq::socket_t*> key_sender_conn(Arguments * param, zmq::context_t & context,
-                               std::vector<std::string> ip, std::vector<int> port,std::vector<zmq::socket_t* >&v);
+zmq::socket_t* key_sender_conn(Arguments * param, zmq::context_t & context,
+                               std::vector<std::string> ip, std::vector<int> port);
 
 zmq::socket_t* shuffle_receiver_conn(Arguments * param, zmq::context_t & context, 
         std::vector<std::string> ip, std::vector<int> port);
-std::vector<zmq::socket_t*> shuffle_sender_conn(Arguments * param, zmq::context_t & context, std::string ip, int port, std::vector<zmq::socket_t* > &v);
+zmq::socket_t* shuffle_sender_conn(Arguments * param, zmq::context_t & context, std::string ip, int port);
 
 #endif	/* UTILS_HPP */

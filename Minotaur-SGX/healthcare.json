@@ -1,21 +1,21 @@
 {
     "servers":[
-              "192.168.10.1", "192.168.10.2"
+             "185.64.106.15", "185.64.106.16"
      ],
      "topology":{
  	"spout" : ["vf", "shuffle"],
         "vf" : ["af", "shuffle", "emerg", "shuffle"],
-	"af" : ["others", "shuffle", "emerg1", "shuffle"]
+	"af" : ["other", "shuffle", "emerg1", "shuffle"]
      },
      
-     "components": ["spout", "vf", "af", "emerg", "emerg1", "others"],
+     "components": ["spout", "vf", "af", "emerg", "emerg1", "other"],
      "parallelism": {
         "spout": 2,
-        "af": 4,
-        "vf": 4,
-	"emerg" : 1,
-  	"emerg1" : 1,
-	"others" : 1
+        "af": 2,
+        "vf": 2,
+	"emerg" : 2,
+  	"emerg1" : 2,
+	"other" : 2
       }
    
 }

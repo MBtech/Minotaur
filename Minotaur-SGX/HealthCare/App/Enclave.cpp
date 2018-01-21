@@ -193,9 +193,9 @@ void enclave_vf_execute(InputData * input, OutputData * output) {
     for(int k = 0; k<count; k++) {
         word = std::string(p_dst);
         if(vf_check(s)){
-        output->stream[k] = 0;
+        output->stream[k] = 1;
         }else{
-	output->stream[k] = 1;
+	output->stream[k] = 0;
 	}
 
         int* r = get_route(word, input->next_parallel[output->stream[k]],ROUTE_ALGO, ROUTE_LEN);
@@ -229,9 +229,11 @@ void enclave_af_execute(InputData * input, OutputData * output) {
     for(int k = 0; k<count; k++) {
         word = std::string(p_dst);
         if(af_check(s)){
-        output->stream[k] = 0;
-        }else{
         output->stream[k] = 1;
+        }else{
+	printf("sending this to others");
+        printf("%s", p_dst);
+        output->stream[k] = 0;
         }
 
         int* r = get_route(word, input->next_parallel[output->stream[k]],ROUTE_ALGO, ROUTE_LEN);
@@ -260,7 +262,7 @@ void enclave_emerg_execute(InputData * input) {
 #endif
     std::vector<int> s = split(p_dst);
     printf("Emergency for user %d", s[0]);
-    printf(p_dst);
+//    printf(p_dst);
 }
 
 void enclave_other_execute(InputData * input) {

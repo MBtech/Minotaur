@@ -6,8 +6,7 @@ timeout=(0 200 400 800 1000)
 for i in "${timeout[@]}"
 do
 
-ssh 192.168.10.1 "sed -i \"s/#define BUFFER_TIMEOUT.*/#define BUFFER_TIMEOUT $i/g\" $dir/Include/user_types.h"
-ssh 192.168.10.2 "sed -i \"s/#define BUFFER_TIMEOUT.*/#define BUFFER_TIMEOUT $i/g\" $dir/Include/user_types.h"
+cat hosts | xargs -I {} ssh {} "sed -i \"s/#define BUFFER_TIMEOUT.*/#define BUFFER_TIMEOUT $i/g\" $dir/Include/user_types.h"
 
 ./$2 $1 $3
 ./preprocess.sh "$1"-"$4" $i

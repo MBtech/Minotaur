@@ -108,7 +108,6 @@ int func_main(int argc, char** argv) {
 //            }
         }
     }
-
     arg -> senderIP = senderIP;
     arg -> receiverIP = receiverIP;
     arg -> senderPort = senderPort;
@@ -131,6 +130,7 @@ int func_main(int argc, char** argv) {
         arg->windowSize=0;
         Sink((void*) arg, enclave_emerg_execute, dummy_window_sink);
     }
+
     else if(strcmp(argv[1], "other")==0) {
         arg->windowSize=0;
         Sink((void*) arg, enclave_other_execute, dummy_window_sink);

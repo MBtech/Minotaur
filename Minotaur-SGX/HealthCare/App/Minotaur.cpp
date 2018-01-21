@@ -15,6 +15,7 @@ void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enc
 {
     zmq::context_t * context;
     zmq::socket_t * sender, * receiver;
+    struct Arguments * param = (Arguments*) arg;
     Sockets* socks = (Sockets*) malloc(sizeof(Sockets));
     int  m=0;
     std::vector<int> n; 
@@ -26,7 +27,7 @@ void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enc
     std::ifstream datafile(file);
     //std::string ptsentence ("Hello is it me you are looking for?");
     std::string ptsentence;
-    std::vector<zmq::socket_t*> sockets = socks->sender;
+    std::vector<zmq::socket_t*> sockets(socks->sender, socks->sender+(param->out_grouping.size()*sizeof(zmq::socket_t*)));
     TimedBuffer s_buff(context,sockets, BUFFER_TIMEOUT);
     sleep(10);
     while(1) {
@@ -89,8 +90,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
     int m=0;
     std::vector<int> n;
     zmq_init(arg, context, socks, &n, &m);
-    std::vector<zmq::socket_t*> sockets;
-    sockets = socks->sender;
+    std::vector<zmq::socket_t*> sockets(socks->sender, socks->sender+(param->out_grouping.size()*sizeof(zmq::socket_t*)));
     TimedBuffer s_buff(context,sockets, BUFFER_TIMEOUT);
     //  Process tasks forever
     while (1) {
