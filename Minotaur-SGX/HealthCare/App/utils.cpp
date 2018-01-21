@@ -52,8 +52,8 @@ void zmq_init(void * arg, zmq::context_t* context,Sockets* socks,  std::vector<i
 zmq::socket_t* key_receiver_conn(Arguments * param, zmq::context_t & context, std::string ip, int port) {
     //  Socket to receive messages on
     zmq::socket_t* receiver =new zmq::socket_t(context, ZMQ_SUB);
-    std::cout << "Connecting receiver to port " << port+param->id<< " IP "<< ip << std::endl;
-    receiver->bind("tcp://"+ip+":"+std::to_string(port+param->id));
+    std::cout << "Binding receiver to port " << port+param->id<< " IP "<< ip << std::endl;
+    receiver->bind("tcp://"+ip+":"+std::to_string(port));
     const char * filter = std::to_string(param->id).c_str();
     receiver->setsockopt(ZMQ_SUBSCRIBE, filter, strlen(filter));
     return receiver;
@@ -76,8 +76,8 @@ zmq::socket_t* shuffle_sender_conn(Arguments * param, zmq::context_t & context, 
     //  Socket to send messages on
     zmq::socket_t * sender = new zmq::socket_t(context, ZMQ_PUB);
     //std::cout << "Binding to " << "tcp://127.0.0.1:"+std::to_string(5000+param->id) << std::endl;
-    std::cout << "Connecting sender to port " << port+param->id << " IP "<< ip << std::endl;
-    sender->bind("tcp://"+ip+":"+std::to_string(port+param->id));
+    std::cout << "Binding sender to port " << port+param->id << " IP "<< ip << std::endl;
+    sender->bind("tcp://"+ip+":"+std::to_string(port));
     
     return sender;
 }
