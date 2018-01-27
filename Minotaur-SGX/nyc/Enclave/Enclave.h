@@ -35,12 +35,25 @@
 
 #include <stdlib.h>
 #include <assert.h>
+#include "user_types.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
+#if defined(SGX) || defined(NOENCRY)
 void printf(const char *fmt, ...);
+#endif
+
+#ifdef NATIVE
+void enclave_spout_execute(char* csmessage,  Parallelism *n, Routes* routes, Stream * stream);
+void enclave_splitter_execute(InputData * input, OutputData * output);
+void enclave_count_execute(InputData * input);
+void dummy_window_func(Parallelism *n , OutputData * output);
+void enclave_aggregate_execute(InputData * input, OutputData * output);
+void count_window(OutputData * output);
+void aggregate_window(Parallelism *n, OutputData * output);
+#endif
 
 #if defined(__cplusplus)
 }

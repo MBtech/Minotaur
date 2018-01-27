@@ -56,6 +56,7 @@ using namespace std;
  */
 
 std::map <std::string, int> count_map, agg_map;
+std::map<std::string, int> output_map;
 int prev = 0;
 #ifdef SGX
 static const unsigned char gcm_key[] = {
@@ -87,7 +88,7 @@ void printf(const char *fmt, ...)
 #endif
 
 #ifdef SGX
-void encrypt(char * line, size_t length, char * p_dst, unsigned char * gcm_tag) {
+bool encrypt(char * line, size_t length, char * p_dst, unsigned char * gcm_tag) {
 
     uint32_t src_len = length;
     uint8_t*  p_src= reinterpret_cast<uint8_t *>(line);
@@ -104,13 +105,16 @@ void encrypt(char * line, size_t length, char * p_dst, unsigned char * gcm_tag) 
 //   aes_gcm_decrypt(p_src, src_len, p_dst, gcm_tag);
     if (SGX_ERROR_MAC_MISMATCH == sgx_status) {
         printf("Mac mismatch");
+        return false;
     } else if (SGX_SUCCESS != sgx_status) {
         printf("No sucess");
+        return false;
     }
+    return true;
 }
 
 
-void decrypt(char * line, size_t length, char * p_dst, char * gcm_tag) {
+bool decrypt(char * line, size_t length, char * p_dst, char * gcm_tag) {
     //printf("Inside the decrypt func");
 //    printf(line);
     uint32_t src_len = length;
@@ -131,10 +135,13 @@ void decrypt(char * line, size_t length, char * p_dst, char * gcm_tag) {
 //   aes_gcm_decrypt(p_src, src_len, p_dst, gcm_tag);
     if (SGX_ERROR_MAC_MISMATCH == sgx_status) {
         printf("Mac mismatch");
+        return false;
     } else if (SGX_SUCCESS != sgx_status) {
         printf("No success");
+        return false;
     }
     delete p_src;
+    return true;
 }
 #endif
 
@@ -146,6 +153,7 @@ std::vector<std::string> split(const char * str, char c= ' ') {
             str++;
         result.push_back(std::string(begin, str));
     } while(0 != *str++);
+    result.back().pop_back();
     return result;
 }
 /*
@@ -168,20 +176,18 @@ char** split(char * str, int * len, const char *c) {
     return array;
 }*/
 
-void enclave_spout_execute(char* csmessage,  int* n, int *j, Routes* routes, Stream * stream) {
+void enclave_spout_execute(char* csmessage,  Parallelism *n, Routes* routes, Stream * stream) {
     //std::vector<std::string> s = split(csmessage);
 
-    int * r = get_route(csmessage,*n, *j,0,1);
+    stream->array[0] = 0;
+    int * r = get_route(csmessage, n->next_parallel[stream->array[0]],0,1);
     //std::copy(r.begin(), r.end(), routes->array[0]);
     memcpy(routes->array[0], r,1*sizeof(int));
-    *j = r[0];
-    stream->array[0] = 0;
     //routes->array[0] = r;
 }
 
 void enclave_splitter_execute(InputData * input, OutputData * output) {
     std::string word;
-    int n = input -> next_parallel;
     char p_dst[input->msg_len];
     memcpy(p_dst, input->message, input->msg_len);
 #ifdef SGX
@@ -203,10 +209,11 @@ void enclave_splitter_execute(InputData * input, OutputData * output) {
         int length = snprintf( NULL, 0, "%d", 1 );
         char* str = (char *)malloc( length + 1 );
         snprintf( str, length + 1, "%d", 1 );
+        //printf("%s", s[k]);
         word = s[k] + " "+ std::string(str);
         free(str);
-        int* r = get_route(s[k], n, n,  ROUTE_ALGO, ROUTE_LEN);
         output->stream[k] = 0;
+        int* r = get_route(s[k], input->next_parallel[output->stream[k]],  ROUTE_ALGO, ROUTE_LEN);
         memcpy(output->routes[k], r, ROUTES*sizeof(int));
         free(r);
         output->msg_len[k]  = word.length();
@@ -223,42 +230,45 @@ void enclave_splitter_execute(InputData * input, OutputData * output) {
 
 void enclave_aggregate_execute(InputData * input, OutputData * output) {
     std::string word;
-    int n = input -> next_parallel;
     char p_dst[input->msg_len];
     memcpy(p_dst, input->message, input->msg_len);
+    bool cont = true;
 #ifdef SGX
-    decrypt(input->message,input->msg_len, p_dst, (char *)input->mac);
+    cont = decrypt(input->message,input->msg_len, p_dst, (char *)input->mac);
 #endif
-    int count = 0;
-    unsigned int j = 0;
-    int i =0;
-    
-    std::vector<std::string> s = split(p_dst);
-    word = s[0];
-    int c = atoi(s[1].c_str());
-    printf("%s", word.c_str());
-    // std::string word (p_dst, p_dst+(input->msg_len));
-    if (agg_map.find(word) != agg_map.end()) {
-        agg_map[word] += c;
-    } else {
-        agg_map[word] = c;
+    if(cont) {
+        int count = 0;
+        unsigned int j = 0;
+        int i =0;
+
+        std::vector<std::string> s = split(p_dst);
+        word = s[0];
+        int c = atoi(s[1].c_str());
+        //printf("%s", word.c_str());
+        // std::string word (p_dst, p_dst+(input->msg_len));
+        if (agg_map.find(word) != agg_map.end()) {
+            agg_map[word] += c;
+        } else {
+            agg_map[word] = c;
+        }
     }
 }
 
-void aggregate_window(int* n , OutputData * output){
+void aggregate_window(Parallelism* n , OutputData * output) {
     std::map<std::string, int>::iterator it = agg_map.begin();
     std::string word;
     output->total_msgs = 0;
     int k =0;
-    for(std::advance(it, prev); it!=agg_map.end() && output->total_msgs <MAX_WORD_IN_SENTENCE; ++it ){
+    for(std::advance(it, prev); it!=agg_map.end() && output->total_msgs <MAX_WORD_IN_SENTENCE; ++it ) {
         output->total_msgs += 1;
         int length = snprintf( NULL, 0, "%d", it->second);
         char* str = (char *)malloc( length + 1 );
         snprintf( str, length + 1, "%d", it->second );
         word = it->first + " "+ std::string(str);
         free(str);
-        int* r = get_route(it->first, *n, *n,  ROUTE_ALGO, ROUTE_LEN);
-        memcpy(output->routes[k], r, ROUTES*sizeof(int));
+        output->stream[k] = 0;
+        int* r = get_route(it->first, n->next_parallel[output->stream[k]],  1, 1);
+        memcpy(output->routes[k], r, 1*sizeof(int));
         free(r);
         output->msg_len[k]  = word.length();
         char gcm_ct [word.length()];
@@ -270,39 +280,42 @@ void aggregate_window(int* n , OutputData * output){
 #endif
         memcpy(output->message[k], gcm_ct, output->msg_len[k]);
         k+=1;
-      }
-     prev += output->total_msgs;
-    if(it==agg_map.end()){
+    }
+    prev += output->total_msgs;
+    if(it==agg_map.end()) {
         prev  = 0;
         agg_map.clear();
-     }
+    }
 }
 
 void enclave_count_execute(InputData * input) {
 
     char p_dst[input->msg_len];
     memcpy(p_dst, input->message, input->msg_len);
-
+    bool cont = true;
 #ifdef SGX
-    decrypt(input->message, input->msg_len, p_dst,(char *)input->mac);
+    cont = decrypt(input->message, input->msg_len, p_dst,(char *)input->mac);
 #endif
-    std::vector<std::string> s = split(p_dst);
-    std::string word = s[0];
-    int c = atoi(s[1].c_str());
-    // std::string word (p_dst, p_dst+(input->msg_len));
-    if (count_map.find(word) != count_map.end()) {
-        count_map[word] += c;
-    } else {
-        count_map[word] = c;
+    if(cont) {
+        std::vector<std::string> s = split(p_dst);
+        std::string word = s[0];
+        int c = atoi(s[1].c_str());
+        // std::string word (p_dst, p_dst+(input->msg_len));
+        if (count_map.find(word) != count_map.end()) {
+            count_map[word] += c;
+        } else {
+            count_map[word] = c;
+        }
     }
-    std::map<std::string, int > ::iterator it;
-/*
-    #ifdef NATIVE
-    printf("%s\n",word.c_str());
-    #else
-    printf(word.c_str());
-    #endif
-*/
+//    std::map<std::string, int > ::iterator it;
+
+    /*
+        #ifdef NATIVE
+        printf("%s\n",word.c_str());
+        #else
+        printf(word.c_str());
+        #endif
+    */
     // Printing the counts
     /*
     for (it = count_map.begin(); it != count_map.end(); it++) {
@@ -313,16 +326,17 @@ void enclave_count_execute(InputData * input) {
     }*/
 }
 
-void dummy_window_func(int *n , OutputData* output){
-  output->total_msgs = 0;
+void dummy_window_func(Parallelism *n , OutputData* output) {
+    output->total_msgs = 0;
 }
 
-void count_window(OutputData * output){
+void count_window(OutputData * output) {
     std::map<std::string, int > ::iterator it;
     // Printing the counts
-    
+    output_map.insert(count_map.begin(), count_map.end());
+    /*
     for (it = count_map.begin(); it != count_map.end(); it++) {
-        printf("%s : %d", it->first.c_str(), it->second);
-    }
+       //printf("%s : %d", it->first.c_str(), it->second);
+    }*/
     count_map.clear();
 }

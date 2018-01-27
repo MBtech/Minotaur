@@ -19,7 +19,7 @@ done
 
 python deploy.py $dir $2
 
-sleep 100
+sleep 50
 
 for IP in ${IPs[@]}
 do

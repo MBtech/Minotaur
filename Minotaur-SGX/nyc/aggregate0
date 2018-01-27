@@ -1,8 +1,0 @@
-starting the program 
-Token:  
-Token path: /home/sgx/enclave.token 
-Starting the threads 
-Starting aggregator
-Connecting to port 7000 IP 192.168.10.2
-terminate called after throwing an instance of 'zmq::error_t'
-  what():  Address already in use

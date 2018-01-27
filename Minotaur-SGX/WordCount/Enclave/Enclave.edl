@@ -50,13 +50,13 @@ enclave {
     from "TrustedLibrary/Thread.edl" import *;
 
     trusted{
-        public void enclave_spout_execute([in, size=100] char * csmessage, [in] int *n, [in,out] int *j, [out, isptr] Routes* routes,[out, isptr] Stream* stream);
+        public void enclave_spout_execute([in, size=100] char * csmessage, [in, isptr] Parallelism *n,  [out, isptr] Routes* routes,[out, isptr] Stream* stream);
         public void enclave_splitter_execute([in,isptr] InputData *input, [out,isptr] OutputData * output);
         public void enclave_count_execute([in, isptr] InputData * input);
-        public void dummy_window_func([in] int *n, [out, isptr] OutputData* output);
+        public void dummy_window_func([in, isptr] Parallelism *n, [out, isptr] OutputData* output);
         public void count_window([out, isptr] OutputData * output);
         public void enclave_aggregate_execute([in,isptr] InputData *input, [out,isptr] OutputData * output);
-     	public void aggregate_window([in] int *n,  [out, isptr] OutputData * output);
+     	public void aggregate_window([in, isptr] Parallelism *n,  [out, isptr] OutputData * output);
     };
     /*
      * ocall_print_string - invokes OCALL to display string buffer inside the enclave.

@@ -2,9 +2,11 @@
 #include <map>
 
 std::map <int, long> load; 
+int j=0;
 
-int* get_route(std::string key, int n, int j, int algo, int nroutes) {
+int* get_route(std::string key, int n, int algo, int nroutes) {
     int * routes = (int*)malloc(sizeof(int) * nroutes);
+    // Shuffle grouping
     if(algo==0){
 	j++;
         j = j% n;

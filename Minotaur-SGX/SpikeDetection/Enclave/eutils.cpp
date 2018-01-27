@@ -2,20 +2,27 @@
 #include <map>
 
 std::map <int, long> load; 
+int j=0;
 
-std::vector<int> get_route(std::string key, int n, int algo, int nroutes) {
-    std::vector<int> routes;
+int* get_route(std::string key, int n, int algo, int nroutes) {
+    int * routes = (int*)malloc(sizeof(int) * nroutes);
+    // Shuffle grouping
+    if(algo==0){
+	j++;
+        j = j% n;
+        routes[0] = j;
+     }
     // Key based grouping
-    if(algo == 1) {
+    else if(algo == 1) {
         std::hash<std::string> hasher;
         long hashed = hasher(key);
         int route  = abs(hashed % n);
-        routes.push_back(route);
+        routes[0]=route;
     }
     // Broadcast
     else if(algo==2) {
         for(int i =0; i < n; i++) {
-            routes.push_back(i);
+            routes[i]=i;
         }
     }
     //Multicast
@@ -25,7 +32,7 @@ std::vector<int> get_route(std::string key, int n, int algo, int nroutes) {
             std::hash<std::string> hasher;
             long hashed = hasher(key);
             int route  = abs((hashed+i) % n);
-            routes.push_back(route);
+            routes[i]=route;
         }
     }
     // Power of n-choice
@@ -47,7 +54,7 @@ std::vector<int> get_route(std::string key, int n, int algo, int nroutes) {
 	    }
 	}	
 	load[min] +=1;
-        routes.push_back(min);
+        routes[0]= min;
     }
 
     return routes;

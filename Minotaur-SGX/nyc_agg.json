@@ -1,15 +1,21 @@
 {
     "servers":[
-              "192.168.10.1", "192.168.10.2"
+             "185.64.106.15", "185.64.106.16"
      ],
-     
+     "topology":{
+	"spout" : ["filter", "shuffle"],
+	"filter" : ["aggregate", "key"],
+	"aggregate" : ["count" , "key"],
+	"count" : ["final", "shuffle"]
+     },
+      
      "components": ["spout", "filter","aggregate", "count", "final"],
      "parallelism": {
-        "spout": "2",
-        "filter": "4",
-        "aggregate": "6",
-        "count": "2",
-	"final" : "1"
+        "spout": 2,
+        "filter": 4,
+        "aggregate": 6,
+        "count": 4,
+	"final" : 1
       }
    
 }

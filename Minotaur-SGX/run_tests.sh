@@ -1,6 +1,6 @@
 #!/bin/bash
 dir=~/bilal/Minotaur/Minotaur-SGX/$1
-timeout=(0 200 400 800 1000)
+timeout=(200 400 800 1000)
 #timeout=(0)
 
 for i in "${timeout[@]}"

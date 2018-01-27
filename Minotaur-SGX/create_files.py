@@ -20,15 +20,17 @@ for component in components:
         fd = open(filename_out, "w")
 	fd1 = open(filename_in, "w")
 	count = 0
-        j = 0
-        for server in servers:
-          
-            for i in range(j, int(parallelism[component]), len(servers)):
-                fd.write(server + " " + str(port+i)+"\n")
-                fd1.write(server + " " + str(port+i)+"\n")
-    		count+=1
+        if(child[c+1]=="shuffle"):
+            p = int(parallelism[component])
+        else:
+	    p = int(parallelism[child[c]])
             
-            j+=1 
+        for i in range(0, p):
+	    server = servers[i%len(servers)]
+            fd.write(server + " " + str(port+i)+"\n")
+            fd1.write(server + " " + str(port+i)+"\n")
+            count+=1
+            
         port = port +count
         fd.close()
 	fd1.close()

@@ -44,13 +44,14 @@
 #define MAX_TUPLE_LEN 100
 #define BUFFER_TIMEOUT 200
 #define MAX_ROUTES 20
-#define ROUTE_LEN 1
-#define ROUTES 1
-#define ROUTE_ALGO 4
-#define SLEEP 5
+#define ROUTE_LEN 8
+#define ROUTES 8
+#define ROUTE_ALGO 3
+#define SLEEP 0
+#define TOTAL_STREAMS 1
 //#define NATIVE
-//#define SGX
-#define NOENCRY
+#define SGX
+//#define NOENCRY
 
 struct StringArray{
     char array[MAX_WORD_LEN][MAX_WORD_IN_SENTENCE];
@@ -76,7 +77,7 @@ struct InputData{
 #ifdef SGX
         uint8_t mac[GCM_TAG_LEN];
 #endif
-        int next_parallel;
+        int next_parallel[TOTAL_STREAMS];
         int source;
 };
 
@@ -90,6 +91,11 @@ struct OutputData{
         int routes[MAX_WORD_IN_SENTENCE][ROUTES];
         int stream[MAX_WORD_IN_SENTENCE];
 };
+
+struct Parallelism{
+	int next_parallel[TOTAL_STREAMS];
+};
+typedef struct Parallelism Parallelism;
 
 
 typedef void *buffer_t;

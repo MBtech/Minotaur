@@ -231,8 +231,6 @@ void enclave_af_execute(InputData * input, OutputData * output) {
         if(af_check(s)){
         output->stream[k] = 1;
         }else{
-	printf("sending this to others");
-        printf("%s", p_dst);
         output->stream[k] = 0;
         }
 

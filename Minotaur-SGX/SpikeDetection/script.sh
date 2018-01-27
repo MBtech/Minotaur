@@ -7,9 +7,9 @@ killbg() {
 
 trap killbg EXIT
 pids=()
-for i in `seq 0 2`
+for i in `seq 0 0`
 do
-./app spout  $i > spoutlog$i & 
+./app spout  $i 192.168.10.2 5000 > spoutlog$i & 
 pids+=($!)
 done
 #sleep 1

@@ -33,12 +33,12 @@
 #include "Minotaur.hpp"
 #include "json.hpp"
 
-using json = nlohmann::json; 
+using json = nlohmann::json;
 
 int func_main(int argc, char** argv) {
 
     //std::map<std::string, int> parallelism;
-    std::ifstream i("../wordcount.json");
+    std::ifstream i("../wordcount_agg.json");
     json j;
     i >> j;
 
@@ -46,15 +46,15 @@ int func_main(int argc, char** argv) {
     std::map<std::string, std::map<std::string, std::vector<std::string>>> topo, grouping;
     std::map<std::string, std::vector<std::string>> topology= j["topology"];
     std::vector<std::string> components = j["components"];
-    for(int i =0; i<components.size()-1; i++){ 
-          std::cout << (topology[components[i]][1]) << std::endl;
-          grouping[components[i]]["out"].push_back(topology[components[i]][1]);
-          grouping[topology[components[i]][0]]["in"].push_back(topology[components[i]][1]);
-          topo[components[i]]["children"].push_back(topology[components[i]][0]);
-          topo[topology[components[i]][0]]["parents"].push_back(components[i]);
-          
-	}
-// TODO: Adapt this code to work for multiple output stages
+    for(int i =0; i<components.size()-1; i++) {
+        for(int j=0; j<topology[components[i]].size(); j=j+2) {
+            grouping[components[i]]["out"].push_back(topology[components[i]][j+1]);
+            grouping[topology[components[i]][j]]["in"].push_back(topology[components[i]][j+1]);
+            topo[components[i]]["children"].push_back(topology[components[i]][j]);
+            topo[topology[components[i]][j]]["parents"].push_back(components[i]);
+        }
+    }
+// TODO: Adapt this code to work for multiple input stages i.e join like scenario
     Arguments * arg = new Arguments;
     arg->id = atoi(argv[2]);
 
@@ -65,44 +65,49 @@ int func_main(int argc, char** argv) {
         arg->prev_stage = 0;
     }
     if(topo[argv[1]]["children"].size()>0 ) {
-        arg->next_stage = parallelism[topo[argv[1]]["children"].back()];
-        arg->out_grouping.push_back(grouping[argv[1]]["out"].back());
-    } else {
-        arg->next_stage = 0;
-    }
-    std::vector<std::string> senderIP, receiverIP;
-    std::vector<int> senderPort, receiverPort;
-    if(grouping[argv[1]]["in"].size()>0) {
-        if(grouping[argv[1]]["in"].back() =="key" ) {
-            receiverPort.push_back(atoi(argv[4]));
-            receiverIP.push_back(std::string(argv[3]));
-        } else {
-            std::string filename = topo[argv[1]]["parents"].back() + "IP";
-            std::ifstream receiverfile(filename);
-            std::string ip, port;
-            while(receiverfile >> ip>>port) {
-                receiverIP.push_back(ip);
-                receiverPort.push_back(stoi(port));
-                std::cout << ip << " " << port << std::endl;
-            }
-        }
-    }
-    if(grouping[argv[1]]["out"].size()>0) {
-        if(grouping[argv[1]]["out"].back() == "shuffle" ) {
-            senderPort.push_back(atoi(argv[4]));
-            senderIP.push_back(std::string(argv[3]));
-        } else {
-            std::string filename = topo[argv[1]]["children"].back() + "IP";
-            std::ifstream senderfile(filename);
-            std::string ip, port;
-            while(senderfile >> ip>>port) {
-                senderIP.push_back(ip);
-                senderPort.push_back(stoi(port));
-                std::cout << ip << " " << port << std::endl;
-            }
+        for(int i =0; i<topo[argv[1]]["children"].size(); i++) {
+            arg->next_stage.push_back(parallelism[topo[argv[1]]["children"][i]]);
+            arg->out_grouping.push_back(grouping[argv[1]]["out"][i]);
         }
     }
 
+    std::vector<std::vector<std::string>> receiverIP(1), senderIP(grouping[argv[1]]["out"].size());
+    std::vector<std::vector<int>> receiverPort(1), senderPort(grouping[argv[1]]["out"].size());
+
+    if(grouping[argv[1]]["in"].size()>0) {
+/*        if(grouping[argv[1]]["in"].back() =="key" ) {
+            receiverPort[0].push_back(atoi(argv[4]));
+            receiverIP[0].push_back(std::string(argv[3]));
+        } else {
+*/
+            std::string filename = std::string(argv[1])+ "_in_0" + "_IP";
+            std::ifstream receiverfile(filename);
+            std::string ip, port;
+            while(receiverfile >> ip>>port) {
+                receiverIP[0].push_back(ip);
+                receiverPort[0].push_back(stoi(port));
+                std::cout << ip << " " << port << std::endl;
+            }
+//        }
+    }
+    if(grouping[argv[1]]["out"].size()>0) {
+        for(int i=0; i<grouping[argv[1]]["out"].size(); i++) {
+/*            if(grouping[argv[1]]["out"][i] == "shuffle" ) {
+                senderPort[i].push_back(atoi(argv[4+(2*i)]));
+                senderIP[i].push_back(std::string(argv[3+(2*i)]));
+            } else {
+*/
+                std::string filename = std::string(argv[1])+ "_out_" + std::to_string(i) + "_IP";
+                std::ifstream senderfile(filename);
+                std::string ip, port;
+                while(senderfile >> ip>>port) {
+                    senderIP[i].push_back(ip);
+                    senderPort[i].push_back(stoi(port));
+                    std::cout << ip << " " << port << std::endl;
+                }
+//            }
+        }
+    }
     arg -> senderIP = senderIP;
     arg -> receiverIP = receiverIP;
     arg -> senderPort = senderPort;
@@ -118,11 +123,10 @@ int func_main(int argc, char** argv) {
         Sink((void*) arg, enclave_count_execute, count_window);
     }
     else{
-	arg->windowSize=10;
-	Bolt((void*) arg, enclave_aggregate_execute, aggregate_window);
-	}
-
-    return 0;
+        arg->windowSize=10;
+        Bolt((void*) arg, enclave_aggregate_execute, aggregate_window);
+        }
+	return 0;
 
 }
 

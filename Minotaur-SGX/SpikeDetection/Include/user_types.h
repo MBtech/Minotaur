@@ -30,35 +30,84 @@
  */
 
 
+#include <stdint.h>
 /* User defined types */
+#ifndef _USER_TYPESH_
+#define _USER_TYPESH_
 
 
 #define LOOPS_PER_THREAD 500
 #define BUFFER 10
 #define GCM_TAG_LEN 16
-#define MAX_WORD_LEN 30
+#define MAX_WORD_LEN 100
 #define MAX_WORD_IN_SENTENCE 20
-#define MAX_TUPLE_LEN 100
-#define BUFFER_TIMEOUT 800
+#define MAX_TUPLE_LEN 200
+#define BUFFER_TIMEOUT 200
 #define MAX_ROUTES 20
-#define ROUTE_LEN 2 // Max routes to choose from
-#define ROUTES 1 // The number of routes to forward
-#define ROUTE_ALGO 4 // Routing type
+#define ROUTE_LEN 1
+#define ROUTES 1
+#define ROUTE_ALGO 4
+#define SLEEP 0
+#define TOTAL_STREAMS 1
+//#define NATIVE
+#define SGX
+//#define NOENCRY
 
-typedef void *buffer_t;
-typedef int array_t[10];
-typedef int word_len[MAX_WORD_IN_SENTENCE];
 struct StringArray{
     char array[MAX_WORD_LEN][MAX_WORD_IN_SENTENCE];
 };
 typedef struct StringArray StringArray;
 
 struct MacArray{
-     uint8_t array[GCM_TAG_LEN][MAX_WORD_IN_SENTENCE];    
+     uint8_t array[GCM_TAG_LEN][MAX_WORD_IN_SENTENCE];
 };
 typedef struct MacArray MacArray;
 
 struct Routes{
-     int array[ROUTE_LEN][MAX_WORD_IN_SENTENCE];
+        int array[MAX_WORD_IN_SENTENCE][ROUTES];
 };
-typedef struct Routes Routes; 
+
+struct Stream{
+        int array[MAX_WORD_IN_SENTENCE];
+};
+
+struct InputData{
+        char message[MAX_TUPLE_LEN];
+        int msg_len;
+#ifdef SGX
+        uint8_t mac[GCM_TAG_LEN];
+#endif
+        int next_parallel[TOTAL_STREAMS];
+        int source;
+};
+
+struct OutputData{
+        char message[MAX_WORD_IN_SENTENCE][MAX_WORD_LEN];
+        int msg_len[MAX_WORD_IN_SENTENCE];
+        int total_msgs;
+#ifdef SGX
+        uint8_t mac[MAX_WORD_IN_SENTENCE][GCM_TAG_LEN];
+#endif
+        int routes[MAX_WORD_IN_SENTENCE][ROUTES];
+        int stream[MAX_WORD_IN_SENTENCE];
+};
+
+struct Parallelism{
+	int next_parallel[TOTAL_STREAMS];
+};
+typedef struct Parallelism Parallelism;
+
+
+typedef void *buffer_t;
+typedef int array_t[10];
+typedef int word_len[MAX_WORD_IN_SENTENCE];
+
+
+typedef struct Routes Routes;
+typedef struct Stream Stream;
+
+typedef struct InputData InputData;
+
+typedef struct OutputData OutputData;
+
+#endif

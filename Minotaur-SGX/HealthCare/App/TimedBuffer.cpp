@@ -63,18 +63,19 @@ void TimedBuffer::check_and_send(bool send) {
 
             message->rebuild(packed.size());
             std::memcpy(message->data(), packed.data(), packed.size());
-            
-	    std::cout << "Sending to stream id " << streamid << std::endl;
+	
             s_sendmore(*(sender[streamid]), std::to_string(it->first));
             sender[streamid]->send(*message);
 	    #ifdef SGX
 	    ++it1;
 	    #endif
-
+            if(!send){
             for(int i=0; i<it2->second.size(); i++){
             long latency = calLatency(tv.tv_sec, tv.tv_nsec, it2->second[i], it3->second[i]);
-            std::cout << "Buffer Latency: " << latency<<std::endl;
+	    //std::cout << "Buffer Latency: " << latency<<std::endl;
+	    std::cout << "Latency: " << latency<<std::endl;
    		}
+            }
         }
 	}
         startMicro = curMicro;
