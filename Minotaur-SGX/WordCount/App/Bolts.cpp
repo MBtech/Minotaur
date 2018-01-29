@@ -38,7 +38,7 @@ using json = nlohmann::json;
 int func_main(int argc, char** argv) {
 
     //std::map<std::string, int> parallelism;
-    std::ifstream i("../wordcount_agg.json");
+    std::ifstream i(std::string("../")+std::string(argv[3]));
     json j;
     i >> j;
 
@@ -117,13 +117,14 @@ int func_main(int argc, char** argv) {
         Spout((void*) arg,file, enclave_spout_execute);
     } else if (strcmp(argv[1], "splitter")==0) {
         arg->windowSize = 0;
+	arg->multiout = true;
         Bolt((void*) arg, enclave_splitter_execute, dummy_window_func);
     } else if(strcmp(argv[1], "count")==0) {
-        arg->windowSize=10;
+        arg->windowSize=1;
         Sink((void*) arg, enclave_count_execute, count_window);
     }
     else{
-        arg->windowSize=10;
+        arg->windowSize=1;
         Bolt((void*) arg, enclave_aggregate_execute, aggregate_window);
         }
 	return 0;

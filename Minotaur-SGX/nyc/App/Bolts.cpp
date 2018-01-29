@@ -38,7 +38,7 @@ using json = nlohmann::json;
 int func_main(int argc, char** argv) {
 
     //std::map<std::string, int> parallelism;
-    std::ifstream i("../nyc_agg.json");
+    std::ifstream i(std::string("../")+std::string(argv[3]));
     json j;
     i >> j;
 
@@ -117,6 +117,7 @@ std::string file = "nyc-taxi.csv";
         Spout((void*) arg, file,enclave_spout_execute);
     } else if (strcmp(argv[1], "filter")==0) {
         arg->windowSize = 0;
+        arg->multiout = true; 
         Bolt((void*) arg, enclave_filter_execute, dummy_window_func);
     } else if(strcmp(argv[1], "count")==0) {
         arg->windowSize=10;

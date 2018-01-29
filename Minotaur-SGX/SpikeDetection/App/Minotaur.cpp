@@ -1,4 +1,5 @@
 #include "Minotaur.hpp"
+#include <thread>
 
 #ifdef SGX
 void encrypt(char * line, size_t len_pt, unsigned char * gcm_ct, unsigned char * gcm_tag) {
@@ -6,6 +7,16 @@ void encrypt(char * line, size_t len_pt, unsigned char * gcm_ct, unsigned char *
     aes_gcm_encrypt(gcm_pt, len_pt, gcm_ct, gcm_tag);
 }
 #endif
+
+void dumbVals(int* counter) {
+    while(1) {
+        struct timespec tv;
+        clock_gettime(CLOCK_REALTIME, &tv);
+        std::cout << "Tuples processed: " << *counter << ",Time: "<< tv.tv_sec << "." <<tv.tv_nsec << std::endl;
+//        std::cout << "Tuples processed: " << *counter << std::endl;
+        usleep(10000);
+    }
+}
 
 #ifdef NATIVE
 void* Spout (void *arg, std::string file, void (*enclave_func) (char* , Parallelism *, Routes*, Stream*))
@@ -33,7 +44,11 @@ void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enc
     while(std::getline(datafile, ptsentence)) {
         datavector.push_back(ptsentence);
     }
-    sleep(10);
+    sleep(5);
+
+    int counter = 0;
+    // Start measurement thread
+    std::thread t1(dumbVals, &counter);
     while(1) {
         for(int in = 0; in<datavector.size(); in++) {
             struct timespec tv;
@@ -67,7 +82,7 @@ void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enc
                 R = ROUTES;
             }
             for(int i=0; i<R; i++) {
-                std::cout << routes->array[0][i] << std::endl;
+                //std::cout << routes->array[0][i] << std::endl;
 //                std::cout << ptsentence << "  "<<  ptsentence.length()<<std::endl;
 #ifdef SGX
                 s_buff.add_msg(stream->array[0], routes->array[0][i], ctsentence, mac, tv.tv_sec, tv.tv_nsec);
@@ -77,6 +92,7 @@ void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enc
                 s_buff.check_and_send(false);
             }
             usleep(SLEEP);
+            counter++;
         }
         //datafile.clear();
         //datafile.seekg(0);
@@ -106,6 +122,19 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
     TimedBuffer s_buff(context,sockets, BUFFER_TIMEOUT);
     bool newWindow = true;
     unsigned long oldestTime, oldestTimeN;
+
+    int counter = 0;
+    // Start measurement thread
+    std::thread t1(dumbVals, &counter);
+
+    int R = 0;
+    if(!param->multiout) {
+        R = 1;
+    }
+    else {
+        R = ROUTES;
+    }
+
     //  Process tasks forever
     while (1) {
         zmq::message_t message;
@@ -113,6 +142,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
         std::string word;
         std::string topic = s_recv(*socks->receiver);
         socks->receiver->recv(&message);
+
 
         Message msg;
         msgpack::unpacked unpacked_body;
@@ -139,6 +169,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
         it1 = mac_buffer.begin();
 #endif
         for(it = msg_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); it != msg_buffer.end(); ++it, ++it2, ++it3) {
+            counter++;
             if(newWindow) {
                 oldestTime = *it2;
                 oldestTimeN = *it3;
@@ -168,18 +199,21 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 //                std::cout << "Processing Latency: " << latency<<std::endl;
                 //std::cout << "Total message: " << output->total_msgs << std::endl;
                 for (int k = 0; k < output->total_msgs; k++) {
+
+                    for(int i=0; i<R; i++) {
 #ifdef SGX
 //                    s_buff.add_msg(output->stream[k],output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
-                    s_buff.add_msg(output->stream[k],output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), *it2, *it3);
+                        s_buff.add_msg(output->stream[k],output->routes[k][i], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), *it2, *it3);
 #else
-                    s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), *it2, *it3);
-                    //s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
+                        s_buff.add_msg(output->stream[k], output->routes[k][i], std::string(output->message[k], output->msg_len[k]), *it2, *it3);
+                        //s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
 #endif
-                    s_buff.check_and_send(false);
-                }
+                        s_buff.check_and_send(false);
+                    }
 #ifdef SGX
-                ++it1;
+                    ++it1;
 #endif
+                }
             }
         }
 
@@ -199,12 +233,14 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 #endif
                     //std::cout << "Total message: " << output->total_msgs << std::endl;
                     for (int k = 0; k < output->total_msgs; k++) {
+                        for(int i=0; i<R; i++) {
 #ifdef SGX
-                        s_buff.add_msg(output->stream[k],output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
+                            s_buff.add_msg(output->stream[k],output->routes[k][i], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
 #else
-                        s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
+                            s_buff.add_msg(output->stream[k], output->routes[k][i], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
 #endif
-                        s_buff.check_and_send(true);
+                            s_buff.check_and_send(true);
+                        }
                     }
 
                     if(output->total_msgs==0) {
@@ -247,6 +283,11 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
     std::vector<int> n;
     zmq_init(arg, context, socks, &n, &m);
     std::cout << "Starting the count worker " << std::endl;
+
+    int counter = 0;
+    // Start measurement thread
+    std::thread t1(dumbVals, &counter);
+
     //  Process tasks forever
     while(1) {
         zmq::message_t message;
@@ -279,6 +320,7 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
 //        OutputData * output = (OutputData* ) malloc(sizeof(OutputData));
 
         for(it = msg_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); it != msg_buffer.end(); ++it, ++it2, ++it3) {
+            counter++;
             clock_gettime(CLOCK_REALTIME, &tv);
             //long latency = calLatency(tv.tv_sec, tv.tv_nsec, *it2, *it3);
             //std::cout << "Network Latency: " << latency<<std::endl;

@@ -16,6 +16,7 @@ struct Arguments{
     int id;
     int windowSize;
     int prev_stage;
+    bool multiout = false; 
     std::vector<int> next_stage;
     std::vector<std::vector<std::string>> senderIP, receiverIP;
     std::vector<std::vector<int>> senderPort, receiverPort;

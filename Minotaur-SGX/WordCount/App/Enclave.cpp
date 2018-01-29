@@ -56,7 +56,7 @@ using namespace std;
  */
 
 std::map <std::string, int> count_map, agg_map;
-std::map<std::string, int> output_map; 
+std::map<std::string, int> output_map;
 int prev = 0;
 #ifdef SGX
 static const unsigned char gcm_key[] = {
@@ -105,10 +105,10 @@ bool encrypt(char * line, size_t length, char * p_dst, unsigned char * gcm_tag) 
 //   aes_gcm_decrypt(p_src, src_len, p_dst, gcm_tag);
     if (SGX_ERROR_MAC_MISMATCH == sgx_status) {
         printf("Mac mismatch");
-	return false; 
+        return false;
     } else if (SGX_SUCCESS != sgx_status) {
         printf("No sucess");
-	return false; 
+        return false;
     }
     return true;
 }
@@ -135,10 +135,10 @@ bool decrypt(char * line, size_t length, char * p_dst, char * gcm_tag) {
 //   aes_gcm_decrypt(p_src, src_len, p_dst, gcm_tag);
     if (SGX_ERROR_MAC_MISMATCH == sgx_status) {
         printf("Mac mismatch");
-	return false;
+        return false;
     } else if (SGX_SUCCESS != sgx_status) {
         printf("No success");
-	return false;
+        return false;
     }
     delete p_src;
     return true;
@@ -152,7 +152,7 @@ std::vector<std::string> split(const char * str, char c= ' ') {
         while (*str != c && *str)
             str++;
         result.push_back(std::string(begin, str));
-    } while(0 != *str++); 
+    } while(0 != *str++);
     result.back().pop_back();
     return result;
 }
@@ -209,7 +209,7 @@ void enclave_splitter_execute(InputData * input, OutputData * output) {
         int length = snprintf( NULL, 0, "%d", 1 );
         char* str = (char *)malloc( length + 1 );
         snprintf( str, length + 1, "%d", 1 );
-	//printf("%s", s[k]);
+        //printf("%s", s[k]);
         word = s[k] + " "+ std::string(str);
         free(str);
         output->stream[k] = 0;
@@ -232,31 +232,34 @@ void enclave_aggregate_execute(InputData * input, OutputData * output) {
     std::string word;
     char p_dst[input->msg_len];
     memcpy(p_dst, input->message, input->msg_len);
+    bool cont = true;
 #ifdef SGX
-    decrypt(input->message,input->msg_len, p_dst, (char *)input->mac);
+    cont = decrypt(input->message,input->msg_len, p_dst, (char *)input->mac);
 #endif
-    int count = 0;
-    unsigned int j = 0;
-    int i =0;
-    
-    std::vector<std::string> s = split(p_dst);
-    word = s[0];
-    int c = atoi(s[1].c_str());
-    //printf("%s", word.c_str());
-    // std::string word (p_dst, p_dst+(input->msg_len));
-    if (agg_map.find(word) != agg_map.end()) {
-        agg_map[word] += c;
-    } else {
-        agg_map[word] = c;
+    if(cont) {
+        int count = 0;
+        unsigned int j = 0;
+        int i =0;
+
+        std::vector<std::string> s = split(p_dst);
+        word = s[0];
+        int c = atoi(s[1].c_str());
+        //printf("%s", word.c_str());
+        // std::string word (p_dst, p_dst+(input->msg_len));
+        if (agg_map.find(word) != agg_map.end()) {
+            agg_map[word] += c;
+        } else {
+            agg_map[word] = c;
+        }
     }
 }
 
-void aggregate_window(Parallelism* n , OutputData * output){
+void aggregate_window(Parallelism* n , OutputData * output) {
     std::map<std::string, int>::iterator it = agg_map.begin();
     std::string word;
     output->total_msgs = 0;
     int k =0;
-    for(std::advance(it, prev); it!=agg_map.end() && output->total_msgs <MAX_WORD_IN_SENTENCE; ++it ){
+    for(std::advance(it, prev); it!=agg_map.end() && output->total_msgs <MAX_WORD_IN_SENTENCE; ++it ) {
         output->total_msgs += 1;
         int length = snprintf( NULL, 0, "%d", it->second);
         char* str = (char *)malloc( length + 1 );
@@ -277,12 +280,12 @@ void aggregate_window(Parallelism* n , OutputData * output){
 #endif
         memcpy(output->message[k], gcm_ct, output->msg_len[k]);
         k+=1;
-      }
-     prev += output->total_msgs;
-    if(it==agg_map.end()){
+    }
+    prev += output->total_msgs;
+    if(it==agg_map.end()) {
         prev  = 0;
         agg_map.clear();
-     }
+    }
 }
 
 void enclave_count_execute(InputData * input) {
@@ -293,26 +296,26 @@ void enclave_count_execute(InputData * input) {
 #ifdef SGX
     cont = decrypt(input->message, input->msg_len, p_dst,(char *)input->mac);
 #endif
-    if(cont){
-    std::vector<std::string> s = split(p_dst);
-    std::string word = s[0];
-    int c = atoi(s[1].c_str());
-    // std::string word (p_dst, p_dst+(input->msg_len));
-    if (count_map.find(word) != count_map.end()) {
-        count_map[word] += c;
-    } else {
-        count_map[word] = c;
+    if(cont) {
+        std::vector<std::string> s = split(p_dst);
+        std::string word = s[0];
+        int c = atoi(s[1].c_str());
+        // std::string word (p_dst, p_dst+(input->msg_len));
+        if (count_map.find(word) != count_map.end()) {
+            count_map[word] += c;
+        } else {
+            count_map[word] = c;
+        }
     }
-}
 //    std::map<std::string, int > ::iterator it;
 
-/*
-    #ifdef NATIVE
-    printf("%s\n",word.c_str());
-    #else
-    printf(word.c_str());
-    #endif
-*/
+    /*
+        #ifdef NATIVE
+        printf("%s\n",word.c_str());
+        #else
+        printf(word.c_str());
+        #endif
+    */
     // Printing the counts
     /*
     for (it = count_map.begin(); it != count_map.end(); it++) {
@@ -323,17 +326,17 @@ void enclave_count_execute(InputData * input) {
     }*/
 }
 
-void dummy_window_func(Parallelism *n , OutputData* output){
-  output->total_msgs = 0;
+void dummy_window_func(Parallelism *n , OutputData* output) {
+    output->total_msgs = 0;
 }
 
-void count_window(OutputData * output){
+void count_window(OutputData * output) {
     std::map<std::string, int > ::iterator it;
     // Printing the counts
     output_map.insert(count_map.begin(), count_map.end());
-     /*
+    /*
     for (it = count_map.begin(); it != count_map.end(); it++) {
-        //printf("%s : %d", it->first.c_str(), it->second);
+       //printf("%s : %d", it->first.c_str(), it->second);
     }*/
     count_map.clear();
 }

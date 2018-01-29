@@ -38,7 +38,7 @@ using json = nlohmann::json;
 int func_main(int argc, char** argv) {
 
     //std::map<std::string, int> parallelism;
-    std::ifstream i("../healthcare.json");
+    std::ifstream i(std::string("../")+std::string(argv[3]));
     json j;
     i >> j;
 

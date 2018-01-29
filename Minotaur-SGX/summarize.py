@@ -13,13 +13,13 @@ for component in components:
         f = open(component+"log"+str(i), "r")
         lat = list()
         for line in f:
-            if re.search('Latency:', line):
-                 lat.append(line)
+            if re.search('Latency:', line) and line.split(':')[1].strip(' ').strip('\n').isdigit():
+                 lat.append(line.split(':')[1].strip(' ').strip('\n'))
        
         print len(lat)
         f.close()
  	f = open("Latency_"+component, "a")
        
-        for line in lat[int(len(lat)/2), :]:
+        for line in lat[int(len(lat)/2):]:
 	    f.write(line+"\n")
         f.close()
