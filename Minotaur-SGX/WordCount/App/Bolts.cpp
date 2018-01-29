@@ -112,6 +112,7 @@ int func_main(int argc, char** argv) {
     arg -> receiverIP = receiverIP;
     arg -> senderPort = senderPort;
     arg-> receiverPort = receiverPort;
+    arg->name = std::string(argv[1]);
     std::string file = "book";
     if(strcmp(argv[1], "spout")==0) {
         Spout((void*) arg,file, enclave_spout_execute);

@@ -8,14 +8,17 @@ void encrypt(char * line, size_t len_pt, unsigned char * gcm_ct, unsigned char *
 }
 #endif
 
-void dumbVals(int* counter) {
+void dumbVals(int* counter, std::string name, int id) {
+    std::ofstream out(name+"processedlog"+std::to_string(id));
+    
     while(1) {
         struct timespec tv;
         clock_gettime(CLOCK_REALTIME, &tv);
-        std::cout << "Tuples processed: " << *counter << ",Time: "<< tv.tv_sec << "." <<tv.tv_nsec << std::endl;
+        out << "Tuples processed: " << *counter << ",Time: "<< tv.tv_sec << "." <<tv.tv_nsec << "\n";
 //        std::cout << "Tuples processed: " << *counter << std::endl;
         usleep(10000);
     }
+    out.close();
 }
 
 #ifdef NATIVE
@@ -48,7 +51,7 @@ void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enc
 
     int counter = 0;
     // Start measurement thread
-    std::thread t1(dumbVals, &counter);
+    std::thread t1(dumbVals, &counter, param->name, param->id);
     while(1) {
         for(int in = 0; in<datavector.size(); in++) {
             struct timespec tv;
@@ -125,7 +128,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 
     int counter = 0;
     // Start measurement thread
-    std::thread t1(dumbVals, &counter);
+    std::thread t1(dumbVals, &counter, param->name, param->id);
 
     int R = 0;
     if(!param->multiout) {
@@ -286,7 +289,7 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
 
     int counter = 0;
     // Start measurement thread
-    std::thread t1(dumbVals, &counter);
+    std::thread t1(dumbVals, &counter, param->name, param->id);
 
     //  Process tasks forever
     while(1) {
