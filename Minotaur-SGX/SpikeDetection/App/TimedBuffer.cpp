@@ -73,7 +73,7 @@ void TimedBuffer::check_and_send(bool send) {
             for(int i=0; i<it2->second.size(); i++){
             long latency = calLatency(tv.tv_sec, tv.tv_nsec, it2->second[i], it3->second[i]);
 	    //std::cout << "Buffer Latency: " << latency<<std::endl;
-	    std::cout << "Latency: " << latency<<std::endl;
+	    std::cout << "Latency:" << latency<<std::endl;
    		}
             }
         }

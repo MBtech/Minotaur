@@ -46,7 +46,7 @@
 #define MAX_ROUTES 20
 #define ROUTE_LEN 1
 #define ROUTES 1
-#define ROUTE_ALGO 4
+#define ROUTE_ALGO 1
 #define SLEEP 0
 #define TOTAL_STREAMS 1
 //#define NATIVE

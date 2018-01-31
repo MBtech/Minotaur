@@ -256,7 +256,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
                 clock_gettime(CLOCK_REALTIME, &t);
                 long latency = calLatency(t.tv_sec, t.tv_nsec, oldestTime, oldestTimeN);
                 //std::cout << "Window Latency: " << latency<<std::endl;
-                std::cout << "Latency: " << latency<<std::endl;
+                std::cout << "Latency:" << latency<<std::endl;
                 beginTime = currTime;
                 newWindow = true;
 
@@ -347,7 +347,7 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
 
             long latency = calLatency(tv.tv_sec, tv.tv_nsec, *it2, *it3);
             //std::cout << "Processing Latency: " << latency<<std::endl;
-            std::cout << "Latency: " << latency<<std::endl;
+            std::cout << "Latency:" << latency<<std::endl;
 #ifdef SGX
             ++it1;
 #endif

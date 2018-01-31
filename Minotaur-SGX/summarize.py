@@ -4,22 +4,16 @@ import re
 import subprocess
 
 f= sys.argv[1]
+buf = sys.argv[2]
 data = json.load(open(f))
 components =data["components"]
 parallelism = data["parallelism"]
 
 for component in components:
     for i in range(0, parallelism[component]):
-        f = open(component+"log"+str(i), "r")
-        lat = list()
-        for line in f:
-            if re.search('Latency:', line) and line.split(':')[1].strip(' ').strip('\n').isdigit():
-                 lat.append(line.split(':')[1].strip(' ').strip('\n'))
-       
-        print len(lat)
-        f.close()
- 	f = open("Latency_"+component, "a")
-       
-        for line in lat[int(len(lat)/2):]:
-	    f.write(line+"\n")
-        f.close()
+        cmd = "cat "+ component+"log"+str(i)+ " | grep 'Latency:' | awk -F: '$2 ~ /^[0-9]+$/ {if($2>0) {print $2}}' > temp ; ./split.sh " + "Latency_"+component+"_"+buf
+        #cmd = "cat "+ component+"log"+str(i)+ " | grep 'Latency:' | awk -F: "
+ # ; ./split.sh " + "Latency_"+component+"_"+buf
+        ps = subprocess.Popen(cmd,shell=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+        output = ps.communicate()[0]
+        print output

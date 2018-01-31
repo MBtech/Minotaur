@@ -1,5 +1,5 @@
 #!/bin/bash
-dir=~/bilal/Minotaur/Minotaur-SGX/$1
+dir=~/Minotaur/Minotaur-SGX/$1
 fileItemString=$(cat hosts |tr "\n" " ")
 
 IPs=($fileItemString)
@@ -11,6 +11,8 @@ python create_files.py $2
 
 for IP in ${IPs[@]}
 do
+scp $2 $IP:~/Minotaur/Minotaur-SGX/
+scp -r $dir $IP:~/Minotaur/Minotaur-SGX/
 scp kill.sh $IP:$dir/
 ssh $IP "sh -c 'cd $dir; ./cleanup.sh; ./kill.sh' "
 scp *IP $IP:$dir/

@@ -175,7 +175,7 @@ void enclave_spout_execute(char* csmessage,  Parallelism *n , Routes* routes, St
     stream->array[0] = 0;
     int * r = get_route(s[2], n->next_parallel[stream->array[0]], ROUTE_ALGO, ROUTE_LEN);
     //std::copy(r.begin(), r.end(), routes->array[0]);
-    memcpy(routes->array[0], r,1*sizeof(int));
+    memcpy(routes->array[0], r, ROUTES*sizeof(int));
     //routes->array[0] = r;
 }
 
@@ -219,8 +219,8 @@ void enclave_ma_execute(InputData * input, OutputData * output) {
     free(source);
 
     output->stream[k] = 0;
-    int* r = get_route(word, input->next_parallel[output->stream[k]],  ROUTE_ALGO, ROUTE_LEN);
-    memcpy(output->routes[k], r, ROUTES*sizeof(int));
+    int* r = get_route(word, input->next_parallel[output->stream[k]],  1,1);
+    memcpy(output->routes[k], r, 1*sizeof(int));
     free(r);
     output->msg_len[k]  = word.length();
     char gcm_ct [word.length()];
@@ -261,9 +261,9 @@ void enclave_aggregate_execute(InputData * input, OutputData * output) {
     word = id + "," + std::string(avg_buff) + "," + s[2];
     int k = 0;
     output->stream[k] = 0;
-    int* r = get_route(word, input->next_parallel[output->stream[k]],  ROUTE_ALGO, ROUTE_LEN);
+    int* r = get_route(word, input->next_parallel[output->stream[k]],  0, 1);
     output->total_msgs = 1;
-    memcpy(output->routes[k], r, ROUTES*sizeof(int));
+    memcpy(output->routes[k], r,1*sizeof(int));
     free(r);
     output->msg_len[k]  = word.length();
     char gcm_ct [word.length()];

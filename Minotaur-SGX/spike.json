@@ -1,0 +1,21 @@
+{
+  "servers":[
+"147.75.69.99",
+"147.75.90.55",
+"147.75.90.159",
+"147.75.90.219"
+],
+     "topology":{
+        "spout" : ["ma", "key"],
+        "ma" : ["spike", "shuffle"]
+
+     },
+     
+     "components": ["spout", "ma", "spike"],
+     "parallelism": {
+        "spout": 2,
+        "ma": 6,
+        "spike": 2
+      }
+   
+}
