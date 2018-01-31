@@ -333,7 +333,7 @@ void dummy_window_func(Parallelism *n , OutputData* output) {
 void count_window(OutputData * output) {
     std::map<std::string, int > ::iterator it;
     // Printing the counts
-    output_map.insert(count_map.begin(), count_map.end());
+//    output_map.insert(count_map.begin(), count_map.end());
     /*
     for (it = count_map.begin(); it != count_map.end(); it++) {
        //printf("%s : %d", it->first.c_str(), it->second);
