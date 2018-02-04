@@ -168,7 +168,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
         std::vector<long>::iterator it2, it3;
 
         std::copy(n.begin(), n.end(), input->next_parallel);
-int index = 0;
+	int index = 0;
 #ifdef SGX
         it1 = mac_buffer.begin();
 #endif
@@ -219,7 +219,7 @@ int index = 0;
 #endif
                 }
             }
-            index++;
+   	index ++;
         }
 
         if(param->windowSize>0) {
