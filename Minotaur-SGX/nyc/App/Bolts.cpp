@@ -121,14 +121,14 @@ std::string file = "nyc-taxi.csv";
         arg->multiout = true; 
         Bolt((void*) arg, enclave_filter_execute, dummy_window_func);
     } else if(strcmp(argv[1], "count")==0) {
-        arg->windowSize=10;
+        arg->windowSize=1;
         Bolt((void*) arg, enclave_count_execute, count_window);
     }else if(strcmp(argv[1], "final")==0){
-arg->windowSize=10;
+arg->windowSize=1;
         Sink((void*) arg, enclave_final_execute, dummy_window_sink);
     }
     else{
-        arg->windowSize=10;
+        arg->windowSize=1;
         Bolt((void*) arg, enclave_aggregate_execute, aggregate_window);
         }
     return 0;

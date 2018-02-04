@@ -300,6 +300,7 @@ void enclave_count_execute(InputData * input) {
         std::vector<std::string> s = split(p_dst);
         std::string word = s[0];
         int c = atoi(s[1].c_str());
+        //printf("%s", word);
         // std::string word (p_dst, p_dst+(input->msg_len));
         if (count_map.find(word) != count_map.end()) {
             count_map[word] += c;

@@ -168,10 +168,11 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
         std::vector<long>::iterator it2, it3;
 
         std::copy(n.begin(), n.end(), input->next_parallel);
+int index = 0;
 #ifdef SGX
         it1 = mac_buffer.begin();
 #endif
-        for(it = msg_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); it != msg_buffer.end(); ++it, ++it2, ++it3) {
+        for(it = msg_buffer.begin(), it2=timeSec.begin(), it3=timeNSec.begin(); index<msg_buffer.size(); ++it, ++it2, ++it3) {
             counter++;
             if(newWindow) {
                 oldestTime = *it2;
@@ -187,7 +188,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
             input->source = param->id;
             std::copy(val.begin(), val.end(), input->message);
 #ifdef SGX
-            std::string tag = *it1;
+            std::string tag = mac_buffer[index];
             std::copy(tag.begin(), tag.end(), input->mac);
 #endif
 #ifdef NATIVE
@@ -218,6 +219,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 #endif
                 }
             }
+            index++;
         }
 
         if(param->windowSize>0) {
@@ -256,7 +258,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
                 clock_gettime(CLOCK_REALTIME, &t);
                 long latency = calLatency(t.tv_sec, t.tv_nsec, oldestTime, oldestTimeN);
                 //std::cout << "Window Latency: " << latency<<std::endl;
-                std::cout << "Latency:" << latency<<std::endl;
+                std::cout << "L:" << latency<<std::endl;
                 beginTime = currTime;
                 newWindow = true;
 
@@ -347,7 +349,7 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
 
             long latency = calLatency(tv.tv_sec, tv.tv_nsec, *it2, *it3);
             //std::cout << "Processing Latency: " << latency<<std::endl;
-            std::cout << "Latency:" << latency<<std::endl;
+            std::cout << "L:" << latency<<std::endl;
 #ifdef SGX
             ++it1;
 #endif

@@ -47,11 +47,13 @@
 #define ROUTE_LEN 1
 #define ROUTES 1
 #define ROUTE_ALGO 4
-#define SLEEP 5
+#define ALGO 2
+#define SELECTIVITY 5
+#define SLEEP 100
 #define TOTAL_STREAMS 2
 //#define NATIVE
-//#define SGX
-#define NOENCRY
+#define SGX
+//#define NOENCRY
 
 struct StringArray{
     char array[MAX_WORD_LEN][MAX_WORD_IN_SENTENCE];
@@ -68,7 +70,7 @@ struct Routes{
 };
 
 struct Stream{
-        int array[MAX_WORD_IN_SENTENCE];
+        int array[MAX_WORD_IN_SENTENCE][TOTAL_STREAMS];
 };
 
 struct InputData{
@@ -89,7 +91,7 @@ struct OutputData{
         uint8_t mac[MAX_WORD_IN_SENTENCE][GCM_TAG_LEN];
 #endif
         int routes[MAX_WORD_IN_SENTENCE][ROUTES];
-        int stream[MAX_WORD_IN_SENTENCE];
+        int stream[MAX_WORD_IN_SENTENCE][TOTAL_STREAMS];
 };
 
 struct Parallelism{

@@ -39,15 +39,15 @@
 #define LOOPS_PER_THREAD 500
 #define BUFFER 10
 #define GCM_TAG_LEN 16
-#define MAX_WORD_LEN 30
-#define MAX_WORD_IN_SENTENCE 20
+#define MAX_WORD_LEN 20
+#define MAX_WORD_IN_SENTENCE 30
 #define MAX_TUPLE_LEN 100
 #define BUFFER_TIMEOUT 200
 #define MAX_ROUTES 20
-#define ROUTE_LEN 1
+#define ROUTE_LEN 2
 #define ROUTES 1
-#define ROUTE_ALGO 1
-#define SLEEP 0
+#define ROUTE_ALGO 4
+#define SLEEP 100
 #define TOTAL_STREAMS 1
 //#define NATIVE
 #define SGX

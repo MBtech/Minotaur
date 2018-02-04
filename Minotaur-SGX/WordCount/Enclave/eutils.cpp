@@ -3,6 +3,19 @@
 
 std::map <int, long> load; 
 int j=0;
+#define A 54059 /* a prime */
+#define B 76963 /* another prime */
+#define C 86969 /* yet another prime */
+#define FIRSTH 37 /* also prime */
+unsigned long hash_str(const char* s)
+{
+   unsigned long h = FIRSTH;
+   while (*s) {
+     h = (h * A) ^ (s[0] * B);
+     s++;
+   }
+   return h; // or return h % C;
+}
 
 int* get_route(std::string key, int n, int algo, int nroutes) {
     int * routes = (int*)malloc(sizeof(int) * nroutes);
@@ -15,9 +28,10 @@ int* get_route(std::string key, int n, int algo, int nroutes) {
     // Key based grouping
     else if(algo == 1) {
         std::hash<std::string> hasher;
-        long hashed = hasher(key);
-        int route  = abs(hashed % n);
-        routes[0]=route;
+	unsigned long hashed = hash_str(key.c_str());
+        //long hashed = hasher(key);
+        int route  = (hashed %n);
+        routes[0]= abs(route);
     }
     // Broadcast
     else if(algo==2) {

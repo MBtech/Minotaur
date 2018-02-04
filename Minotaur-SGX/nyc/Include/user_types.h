@@ -44,14 +44,15 @@
 #define MAX_TUPLE_LEN 300
 #define BUFFER_TIMEOUT 200
 #define MAX_ROUTES 20
-#define ROUTE_LEN 1
+#define ROUTE_LEN 2
 #define ROUTES 1
 #define ROUTE_ALGO 4
 #define SLEEP 5
 #define TOTAL_STREAMS 1
 //#define NATIVE
-//#define SGX
-#define NOENCRY
+#define SGX
+//#define NOENCRY
+
 
 struct StringArray{
     char array[MAX_WORD_LEN][MAX_WORD_IN_SENTENCE];
