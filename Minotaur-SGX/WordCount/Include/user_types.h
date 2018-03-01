@@ -64,7 +64,7 @@ struct MacArray{
 typedef struct MacArray MacArray;
 
 struct Routes{
-        int array[MAX_WORD_IN_SENTENCE][ROUTES];
+        int array[MAX_WORD_IN_SENTENCE*ROUTES];
 };
 
 struct Stream{
@@ -81,15 +81,26 @@ struct InputData{
         int source;
 };
 
-struct OutputData{
-        char message[MAX_WORD_IN_SENTENCE][MAX_WORD_LEN];
-        int msg_len[MAX_WORD_IN_SENTENCE];
+struct OutputSpout{
+	 char message[ROUTES][MAX_TUPLE_LEN];
+        int msg_len[ROUTES];
         int total_msgs;
 #ifdef SGX
-        uint8_t mac[MAX_WORD_IN_SENTENCE][GCM_TAG_LEN];
+        uint8_t mac[ROUTES][GCM_TAG_LEN];
 #endif
-        int routes[MAX_WORD_IN_SENTENCE][ROUTES];
-        int stream[MAX_WORD_IN_SENTENCE];
+        int routes[ROUTES];
+        int stream[ROUTES];
+};
+
+struct OutputData{
+        char message[MAX_WORD_IN_SENTENCE*ROUTES][MAX_WORD_LEN];
+        int msg_len[MAX_WORD_IN_SENTENCE*ROUTES];
+        int total_msgs;
+#ifdef SGX
+        uint8_t mac[MAX_WORD_IN_SENTENCE*ROUTES][GCM_TAG_LEN];
+#endif
+        int routes[MAX_WORD_IN_SENTENCE*ROUTES];
+        int stream[MAX_WORD_IN_SENTENCE*ROUTES];
 };
 
 struct Parallelism{
@@ -109,5 +120,7 @@ typedef struct Stream Stream;
 typedef struct InputData InputData;
 
 typedef struct OutputData OutputData;
+
+typedef struct OutputSpout OutputSpout;
 
 #endif

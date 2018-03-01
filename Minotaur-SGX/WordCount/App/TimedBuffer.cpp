@@ -64,7 +64,7 @@ void TimedBuffer::check_and_send(bool send) {
             message->rebuild(packed.size());
             std::memcpy(message->data(), packed.data(), packed.size());
 	
-            s_sendmore(*(sender[streamid]), std::to_string(it->first));
+            s_sendmore(*(sender[streamid]), std::to_string(1000+it->first));
             sender[streamid]->send(*message);
 	    #ifdef SGX
 	    ++it1;

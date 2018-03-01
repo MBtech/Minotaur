@@ -22,9 +22,9 @@ void dumbVals(int* counter, std::string name, int id) {
 }
 
 #ifdef NATIVE
-void* Spout (void *arg, std::string file, void (*enclave_func) (char* , Parallelism *, Routes*, Stream*))
+void* Spout (void *arg, std::string file, void (*enclave_func) (InputData* , OutputSpout*))
 #else
-void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enclave_id_t, char* , Parallelism *, Routes*, Stream*))
+void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData* , OutputSpout*))
 #endif
 {
     zmq::context_t * context;
@@ -67,15 +67,18 @@ void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enc
             std::string ctsentence((char *)gcm_ct, (int)ptsentence.length());
             std::string mac((char*) gcm_tag, GCM_TAG_LEN);
 #endif
-
-            Routes * routes = (Routes* ) malloc(sizeof(Routes));
-            Stream * stream = (Stream *) malloc(sizeof(Stream));
-            Parallelism * para = (Parallelism* ) malloc(sizeof(Parallelism));
-            std::copy(n.begin(), n.end(), para->next_parallel);
+            InputData * input = (InputData* ) malloc(sizeof(InputData));
+            OutputSpout * output = (OutputSpout* ) malloc(sizeof(OutputSpout));
+            std::copy(n.begin(), n.end(), input->next_parallel);
+	    
+	    std::copy(ctsentence.begin(), ctsentence.end(), input->message);
+	    std::copy(mac.begin(), mac.end(), input->mac);
+	    input->msg_len = ctsentence.length();
+	    input->source = param->id;
 #ifdef NATIVE
-            enclave_func((char*) ptsentence.c_str(), para, routes, stream);
+            enclave_func(input, output);
 #else
-            enclave_func(global_eid,(char*) ptsentence.c_str(),para, routes, stream);
+            enclave_func(global_eid, input, output);
 #endif
             int R = 0;
             if(strcmp(param->out_grouping[0].c_str(), "shuffle")==0) {
@@ -88,9 +91,9 @@ void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enc
                 //std::cout << routes->array[0][i] << std::endl;
 //                std::cout << ptsentence << "  "<<  ptsentence.length()<<std::endl;
 #ifdef SGX
-                s_buff.add_msg(stream->array[0], routes->array[0][i], ctsentence, mac, tv.tv_sec, tv.tv_nsec);
+                s_buff.add_msg(output->stream[i],output->routes[i], std::string(output->message[i], output->msg_len[i]), std::string((char*) output->mac[i], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
 #else
-                s_buff.add_msg(stream->array[0], routes->array[0][i], ptsentence, tv.tv_sec, tv.tv_nsec);
+                s_buff.add_msg(output->stream[i], output->routes[], ptsentence, tv.tv_sec, tv.tv_nsec);
 #endif
                 s_buff.check_and_send(false);
             }
@@ -204,16 +207,14 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
                 //std::cout << "Total message: " << output->total_msgs << std::endl;
                 for (int k = 0; k < output->total_msgs; k++) {
 
-                    for(int i=0; i<R; i++) {
 #ifdef SGX
 //                    s_buff.add_msg(output->stream[k],output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
-                        s_buff.add_msg(output->stream[k],output->routes[k][i], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), *it2, *it3);
+                        s_buff.add_msg(output->stream[k],output->routes[k], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), *it2, *it3);
 #else
-                        s_buff.add_msg(output->stream[k], output->routes[k][i], std::string(output->message[k], output->msg_len[k]), *it2, *it3);
+                        s_buff.add_msg(output->stream[k], output->routes[k], std::string(output->message[k], output->msg_len[k]), *it2, *it3);
                         //s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
 #endif
                         s_buff.check_and_send(false);
-                    }
 #ifdef SGX
                     ++it1;
 #endif
@@ -238,14 +239,12 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 #endif
                     //std::cout << "Total message: " << output->total_msgs << std::endl;
                     for (int k = 0; k < output->total_msgs; k++) {
-                        for(int i=0; i<R; i++) {
 #ifdef SGX
-                            s_buff.add_msg(output->stream[k],output->routes[k][i], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
+                            s_buff.add_msg(output->stream[k],output->routes[k], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
 #else
-                            s_buff.add_msg(output->stream[k], output->routes[k][i], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
+                            s_buff.add_msg(output->stream[k], output->routes[k], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
 #endif
                             s_buff.check_and_send(true);
-                        }
                     }
 
                     if(output->total_msgs==0) {

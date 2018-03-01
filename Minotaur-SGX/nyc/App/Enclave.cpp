@@ -141,16 +141,25 @@ void decrypt(char * line, size_t length, char * p_dst, char * gcm_tag) {
 }
 #endif
 
-std::vector<std::string> split(const char * str, char c= ' ') {
+std::vector<std::string> split(const char * str, int len, char c= ' ') {
     std::vector<std::string> result;
+
     do {
         const char * begin = str;
-        while (*str != c && *str)
+        while (*str != c && *str && len>0) {
             str++;
+            len --;
+        }
         result.push_back(std::string(begin, str));
-    } while(0 != *str++);
+        str++;
+        len--;
+    } while(len>0);
+    //} while(0 != *str++);
+    // Remove the last character
+    //result.back().pop_back();
     return result;
 }
+
 std::string find_top_n_keys(std::map <std::string, int> mymap, int n) {
     std::vector<std::pair<std::string, int>> top_n(n);
     std::partial_sort_copy(mymap.begin(),
@@ -173,35 +182,36 @@ std::string find_top_n_keys(std::map <std::string, int> mymap, int n) {
 
     return top;
 }
-/*
-char** split(char * str, int * len, const char *c) {
-    char **array = (char**) malloc(sizeof(char*)*20*30);
-    int i=0;
-//array[i] = (char*) malloc(sizeof(char)*30);
-    array[i] = strtok(str,c);
-    int step = 0;
-    int count = 0;
-    while(array[i]!=NULL)
-    {
-        count++;
-        step = strlen(array[i]);
-        //array[++i] = (char*) malloc(sizeof(char)*30);
-        i = i + step+1;
-        array[i] = strtok(NULL,c);
-    }
-    *len = count;
-    return array;
-}*/
 
-void enclave_spout_execute(char* csmessage,  Parallelism *n, Routes* routes, Stream * stream) {
+void enclave_spout_execute(InputData *input,  OutputSpout * output) {
     //std::vector<std::string> s = split(csmessage);
-    stream->array[0] = 0;
-    int * r = get_route(csmessage,n->next_parallel[stream->array[0]],0,1);
+    std::string word;
+    char p_dst[input->msg_len];
+    memcpy(p_dst, input->message, input->msg_len);
+#ifdef SGX
+    decrypt(input->message,input->msg_len, p_dst, (char *)input->mac);
+#endif
+    int valid = 0;
+    int stream_id = 0;
+    int * r = get_route(p_dst, input->next_parallel[stream_id],0,1, &valid);
     //std::copy(r.begin(), r.end(), routes->array[0]);
-    memcpy(routes->array[0], r,1*sizeof(int));
-    //*j = r[0];
-    //routes->array[0] = r;
+    //memcpy(routes->array[0], r,1*sizeof(int));
+    for(int i=0; i<ROUTES; i++) {
+        output->routes[i] = r[i];
+        output->stream[i] = stream_id;
+        output->total_msgs++;
+        output->msg_len[i]  = input->msg_len;
+        char gcm_ct [input->msg_len];
+        memcpy(gcm_ct, p_dst, input->msg_len);
+#ifdef SGX
+        unsigned char ret_tag[16];
+        encrypt(p_dst, input->msg_len, gcm_ct, ret_tag);
+        memcpy(output->mac[i], ret_tag, 16);
+#endif
+        memcpy(output->message[i], gcm_ct, output->msg_len[i]);
+    }
 }
+
 
 void enclave_filter_execute(InputData * input, OutputData * output) {
     std::string word;
@@ -211,34 +221,41 @@ void enclave_filter_execute(InputData * input, OutputData * output) {
     decrypt(input->message,input->msg_len, p_dst, (char *)input->mac);
 #endif
     int count = 0;
-    // char * token = (char*)malloc(sizeof(char));
-    // token[0] = ' ';
-    // char ** s = split(p_dst, &count, (const char*)token);
-    std::vector<std::string> s = split(p_dst, ',');
+    std::vector<std::string> s = split(p_dst, input->msg_len,',');
     unsigned int j = 0;
     int k =0;
-    output->total_msgs = 1;
+    output->total_msgs = 0;
+    int valid = 0;
 
     int length = snprintf( NULL, 0, "%d", 1 );
     char* str = (char *)malloc( length + 1 );
     snprintf( str, length + 1, "%d", 1 );
 
-    word = s[18]+ "," +s[4]+ "," +s[16]+ "," +s[17];
-    output->stream[k] = 0;
-    int* r = get_route(word, input->next_parallel[output->stream[k]], ROUTE_ALGO, ROUTE_LEN);
+    word = s[18]+ "," +s[4]+ "," +s[16]+ "," +s[17]+ " " + std::string(str);
+    int stream_id = 0;
+    int* r = get_route(word, input->next_parallel[stream_id], ROUTE_ALGO, ROUTE_LEN, &valid);
     word = word + " " + std::string(str);
     free(str);
-    memcpy(output->routes[k], r, ROUTES*sizeof(int));
-    free(r);
-    output->msg_len[k]  = word.length();
-    char gcm_ct [word.length()];
-    memcpy(gcm_ct, word.c_str(), word.length());
+    for(int i=0; i<ROUTES; i++) {
+        std::string new_word;
+        if(i==valid) {
+            new_word = append_valid(word, 1);
+        } else {
+            new_word = append_valid(word, 0);
+        }
+        output->routes[i] = r[i];
+        output->stream[i] = stream_id;
+        output->total_msgs++;
+        output->msg_len[i]  = new_word.length();
+        char gcm_ct [new_word.length()];
+        memcpy(gcm_ct, new_word.c_str(), new_word.length());
 #ifdef SGX
-    unsigned char ret_tag[16];
-    encrypt((char * )word.c_str(), word.length(), gcm_ct, ret_tag);
-    memcpy(output->mac[k], ret_tag, 16);
+        unsigned char ret_tag[16];
+        encrypt((char * )new_word.c_str(), new_word.length(), gcm_ct, ret_tag);
+        memcpy(output->mac[i], ret_tag, 16);
 #endif
-    memcpy(output->message[k], gcm_ct, output->msg_len[k]);
+        memcpy(output->message[i], gcm_ct, output->msg_len[i]);
+    }
 }
 
 void enclave_aggregate_execute(InputData * input, OutputData * output) {
@@ -252,8 +269,7 @@ void enclave_aggregate_execute(InputData * input, OutputData * output) {
     int count = 0;
     unsigned int j = 0;
     int i =0;
-
-    std::vector<std::string> s = split(p_dst);
+    std::vector<std::string>s = split(p_dst, input->msg_len);
     word = s[0];
     int c = atoi(s[1].c_str());
     // std::string word (p_dst, p_dst+(input->msg_len));
@@ -277,11 +293,12 @@ void aggregate_window(Parallelism * n , OutputData * output) {
         snprintf( str, length + 1, "%d", it->second );
         word = it->first + " "+ std::string(str);
         free(str);
-        int* r = get_route(it->first, n->next_parallel[output->stream[k]],  1, 1);
+	int valid = 0;
+        int* r = get_route(it->first, n->next_parallel[output->stream[k]],  1, 1, &valid);
         /*long hashed = hashit(it->first);
         int route  = abs((hashed%1000) % n->next_parallel[output->stream[k]]);
         printf("%lu , %d", hashed, route);*/
-        memcpy(output->routes[k], r, ROUTES*sizeof(int));
+        output->routes[k] = r[0];
         free(r);
         output->msg_len[k]  = word.length();
         char gcm_ct [word.length()];
@@ -309,7 +326,7 @@ void enclave_count_execute(InputData * input, OutputData * output) {
 #ifdef SGX
     decrypt(input->message, input->msg_len, p_dst,(char *)input->mac);
 #endif
-    std::vector<std::string> s = split(p_dst);
+    std::vector<std::string> s = split(p_dst, input->msg_len);
     std::string word = s[0];
     double temp = ::atof(word.c_str());
     int length = snprintf( NULL, 0, "%.3f", temp);
@@ -317,10 +334,15 @@ void enclave_count_execute(InputData * input, OutputData * output) {
     snprintf( str, length + 1, "%.3f", temp );
     int c = atoi(s[1].c_str());
     // std::string word (p_dst, p_dst+(input->msg_len));
-    if (count_map.find(str) != count_map.end()) {
-        count_map[str] += c;
+    printf("%s",p_dst);
+    if(((s.size()>2) && (atoi(s[2].c_str())==1)) || s.size()<=2) {
+        if (count_map.find(str) != count_map.end()) {
+            count_map[str] += c;
+        } else {
+            count_map[str] = c;
+        }
     } else {
-        count_map[str] = c;
+        printf("Not Valid. Fake Packet");
     }
     /*
         #ifdef NATIVE
@@ -348,8 +370,9 @@ void count_window(Parallelism* n , OutputData * output) {
         printf("Size of count map: %d", count_map.size());
         word = find_top_n_keys(count_map, TOP_N);
         output->stream[k]=0;
-        int* r = get_route(word, n->next_parallel[output->stream[k]],  ROUTE_ALGO, ROUTE_LEN);
-        memcpy(output->routes[k], r, ROUTES*sizeof(int));
+	int valid = 0;
+        int* r = get_route(word, n->next_parallel[output->stream[k]], 1,1, &valid);
+        output->routes[k] = r[0];
         free(r);
         output->msg_len[k]  = word.length();
         char gcm_ct [word.length()];
@@ -373,7 +396,7 @@ void enclave_final_execute(InputData * input) {
 #ifdef SGX
     decrypt(input->message, input->msg_len, p_dst,(char *)input->mac);
 #endif
-    std::vector<std::string> s =  split(p_dst,';');
+    std::vector<std::string> s =  split(p_dst,input->msg_len,';');
     std::string word;
 
     for(std::vector<std::string>::iterator it = s.begin(); it != s.end(); ++it) {
@@ -381,7 +404,7 @@ void enclave_final_execute(InputData * input) {
         if(c.length()==0) {
             continue;
         }
-        std::vector<std::string> kv =  split(c.c_str(),'|');
+        std::vector<std::string> kv =  split(c.c_str(),c.length(),'|');
         std::string k = kv.front();
 
         int v = atoi(kv.back().c_str());

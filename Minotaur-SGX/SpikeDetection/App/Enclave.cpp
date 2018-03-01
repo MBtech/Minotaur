@@ -139,16 +139,25 @@ void decrypt(char * line, size_t length, char * p_dst, char * gcm_tag) {
 }
 #endif
 
-std::vector<std::string> split(const char * str, char c= ' ') {
+std::vector<std::string> split(const char * str, int len, char c= ' ') {
     std::vector<std::string> result;
+
     do {
         const char * begin = str;
-        while (*str != c && *str)
+        while (*str != c && *str && len>0){
             str++;
+            len --;
+        }
         result.push_back(std::string(begin, str));
-    } while(0 != *str++);
+        str++;
+        len--;
+     }while(len>0);
+    //} while(0 != *str++);
+     // Remove the last character
+    //result.back().pop_back();
     return result;
 }
+
 /*
 char** split(char * str, int * len, const char *c) {
     char **array = (char**) malloc(sizeof(char*)*20*30);
@@ -169,14 +178,38 @@ char** split(char * str, int * len, const char *c) {
     return array;
 }*/
 
-void enclave_spout_execute(char* csmessage,  Parallelism *n , Routes* routes, Stream * stream) {
-    std::vector<std::string> s = split(csmessage);
-
-    stream->array[0] = 0;
-    int * r = get_route(s[2], n->next_parallel[stream->array[0]], ROUTE_ALGO, ROUTE_LEN);
-    //std::copy(r.begin(), r.end(), routes->array[0]);
-    memcpy(routes->array[0], r, ROUTES*sizeof(int));
-    //routes->array[0] = r;
+void enclave_spout_execute(InputData *input,  OutputSpout * output) {
+    int valid = 0;
+    char p_dst[input->msg_len];
+    memcpy(p_dst, input->message, input->msg_len);
+#ifdef SGX
+    decrypt(input->message,input->msg_len, p_dst, (char *)input->mac);
+#endif
+    std::vector<std::string> s = split(p_dst, input->msg_len);
+    int stream_id = 0;
+    int * r = get_route(s[2], input->next_parallel[stream_id], ROUTE_ALGO, ROUTE_LEN, &valid);
+	
+    std::string word = std::string(p_dst);
+    for(int i=0; i<ROUTES; i++){
+	std::string new_word;
+	if(i==valid){
+                        new_word = append_valid(word, 1);
+                }else{
+                        new_word = append_valid(word, 0);
+                }
+        output->routes[i] = r[i];
+        output->stream[i] = stream_id;
+        output->total_msgs++;
+        output->msg_len[i]  = new_word.length();
+                char gcm_ct [new_word.length()];
+                memcpy(gcm_ct, new_word.c_str(), new_word.length());
+#ifdef SGX
+                unsigned char ret_tag[16];
+                encrypt((char*) new_word.c_str(), new_word.length(), gcm_ct, ret_tag);
+                memcpy(output->mac[i], ret_tag, 16);
+#endif
+                memcpy(output->message[i], gcm_ct, output->msg_len[i]);
+    }
 }
 
 void enclave_ma_execute(InputData * input, OutputData * output) {
@@ -190,16 +223,17 @@ void enclave_ma_execute(InputData * input, OutputData * output) {
     // char * token = (char*)malloc(sizeof(char));
     // token[0] = ' ';
     // char ** s = split(p_dst, &count, (const char*)token);
-    std::vector<std::string> s = split(p_dst);
-    count = s.size();
+    std::vector<std::string> s = split(p_dst, input->msg_len);
     unsigned int j = 0;
     double average=0.0;
     int k =0;
     output->total_msgs = 1;
-
-    // s[0] is the device ID and s[1] is the event value
+    int valid = 0;
+   
+    printf("%s", s[8]); 
     //s[3] is ID of the sensor node
     std::vector<double> vals = event_vals[s[3]];
+    if(((s.size()>8) && (atoi(s[8].c_str())==1)) || s.size()<=8){
     if(vals.size()>1000) {
         total_sum[s[3]] -= event_vals[s[3]].back();
         event_vals[s[3]].pop_back();
@@ -207,6 +241,9 @@ void enclave_ma_execute(InputData * input, OutputData * output) {
 
     event_vals[s[3]].push_back(atof(s[6].c_str()));
     total_sum[s[3]] += atof(s[6].c_str());
+    valid =1 ;
+    printf("Received: %s", p_dst);
+    }
     average = total_sum[s[3]]/event_vals[s[3]].size();
 
     char avg_buff[10] = {};
@@ -215,12 +252,13 @@ void enclave_ma_execute(InputData * input, OutputData * output) {
     int length = snprintf(NULL, 0, "%d", input->source);
     char* source = (char*) malloc(length+1);
     snprintf(source, length+1, "%d" , input->source);
-    word = id + "," + std::string(avg_buff) + "," + s[6] + ","+source;
+    word = id + " " + std::string(avg_buff) + " " + s[6] + " "+source;
+    word = append_valid(word, valid);
     free(source);
 
     output->stream[k] = 0;
-    int* r = get_route(word, input->next_parallel[output->stream[k]],  1,1);
-    memcpy(output->routes[k], r, 1*sizeof(int));
+    int* r = get_route(word, input->next_parallel[output->stream[k]],  1,1, &valid);
+    output->routes[k] = r[0];
     free(r);
     output->msg_len[k]  = word.length();
     char gcm_ct [word.length()];
@@ -235,19 +273,23 @@ void enclave_ma_execute(InputData * input, OutputData * output) {
 }
 
 void enclave_aggregate_execute(InputData * input, OutputData * output) {
-    std::string word;
+    std::string word; 
+     int valid = 0;
     char p_dst[input->msg_len];
     memcpy(p_dst, input->message, input->msg_len);
 #ifdef SGX
     decrypt(input->message,input->msg_len, p_dst, (char *)input->mac);
 #endif
-    std::vector<std::string> s = split(p_dst, ','); 
+    std::vector<std::string> s = split(p_dst, input->msg_len); 
     int source = atoi(s[3].c_str());
     word = s[0];
     int c = atoi(s[1].c_str());
     printf("%s", word.c_str());
     // std::string word (p_dst, p_dst+(input->msg_len));
-    agg_map[word][source] = c;
+    if((atoi(s[4].c_str())==1)){
+	 valid = 1; 
+         agg_map[word][source] = c;
+    }
     double average = 0.0;
     for(map<int,double>::iterator it = agg_map[word].begin(); it != agg_map[word].end(); ++it) {
      average +=(it->first);
@@ -258,12 +300,13 @@ void enclave_aggregate_execute(InputData * input, OutputData * output) {
     char avg_buff[10] = {};
     snprintf(avg_buff, 10, "%f" , average);
     std::string id  = s[0];
-    word = id + "," + std::string(avg_buff) + "," + s[2];
+    word = id + " " + std::string(avg_buff) + " " + s[2];
+     word = append_valid(word, valid);
     int k = 0;
     output->stream[k] = 0;
-    int* r = get_route(word, input->next_parallel[output->stream[k]],  0, 1);
+    int* r = get_route(word, input->next_parallel[output->stream[k]],  0, 1, &valid);
     output->total_msgs = 1;
-    memcpy(output->routes[k], r,1*sizeof(int));
+    output->routes[k] = r[0];
     free(r);
     output->msg_len[k]  = word.length();
     char gcm_ct [word.length()];
@@ -318,13 +361,14 @@ void enclave_spike_execute(InputData * input) {
 #ifdef SGX
     decrypt(input->message, input->msg_len, p_dst,(char *)input->mac);
 #endif
-    std::vector<std::string> s = split(p_dst, ',');
+    printf("%s", p_dst);
+    std::vector<std::string> s = split(p_dst, input->msg_len);
     std::string device_id = s[0];
     double avg = atof(s[1].c_str());
     double val = atof(s[2].c_str());
     double threshold = 0.5;
     //printf(input->message);
-    if((val-avg) > threshold * avg) {
+    if(((val-avg) > threshold * avg) && (atoi(s[3].c_str())==1)) {
         printf("Spike occurred");
     }
 }

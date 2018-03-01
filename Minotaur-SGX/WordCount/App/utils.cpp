@@ -54,7 +54,7 @@ zmq::socket_t* key_receiver_conn(Arguments * param, zmq::context_t & context, st
     zmq::socket_t* receiver =new zmq::socket_t(context, ZMQ_SUB);
     std::cout << "Binding receiver to port " << port<< " IP "<< ip << std::endl;
     receiver->bind("tcp://"+ip+":"+std::to_string(port));
-    const char * filter = std::to_string(param->id).c_str();
+    const char * filter = std::to_string(1000+param->id).c_str();
     receiver->setsockopt(ZMQ_SUBSCRIBE, filter, strlen(filter));
     return receiver;
 }
@@ -91,7 +91,7 @@ zmq::socket_t* shuffle_receiver_conn(Arguments * param, zmq::context_t & context
         receiver->connect("tcp://"+ip[i]+":"+std::to_string(port[i]));
     }
 
-    const char * filter = std::to_string(param->id).c_str();
+    const char * filter = std::to_string(1000+param->id).c_str();
     receiver->setsockopt(ZMQ_SUBSCRIBE, filter, strlen(filter));
     return receiver;
 }
