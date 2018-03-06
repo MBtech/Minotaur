@@ -14,7 +14,7 @@
 struct Arguments{
     const char * ip; 
     int id;
-    int windowSize;
+    float windowSize;
     int prev_stage;
     bool multiout = false; 
     std::string name;

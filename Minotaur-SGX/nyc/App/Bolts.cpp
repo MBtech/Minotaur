@@ -117,18 +117,18 @@ std::string file = "nyc-taxi.csv";
     if(strcmp(argv[1], "spout")==0) {
         Spout((void*) arg, file,enclave_spout_execute);
     } else if (strcmp(argv[1], "filter")==0) {
-        arg->windowSize = 0;
+        arg->windowSize = 0.0;
         arg->multiout = true; 
         Bolt((void*) arg, enclave_filter_execute, dummy_window_func);
     } else if(strcmp(argv[1], "count")==0) {
-        arg->windowSize=1;
+        arg->windowSize=1.0;
         Bolt((void*) arg, enclave_count_execute, count_window);
     }else if(strcmp(argv[1], "final")==0){
-arg->windowSize=1;
+arg->windowSize=1.0;
         Sink((void*) arg, enclave_final_execute, dummy_window_sink);
     }
     else{
-        arg->windowSize=1;
+        arg->windowSize=0.01;
         Bolt((void*) arg, enclave_aggregate_execute, aggregate_window);
         }
     return 0;

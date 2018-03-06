@@ -114,11 +114,14 @@ int func_main(int argc, char** argv) {
         arg -> senderPort = senderPort;
         arg-> receiverPort = receiverPort;
         arg->name = std::string(argv[1]);
-        std::string file = "zipf_data";
+        std::vector<std::string> files;
+	files.push_back("zipf_data_1.2");
+	files.push_back("zipf_data_1.6");
+	files.push_back("zipf_data_1.4");
         if(strcmp(argv[1], "spout")==0) {
-            Spout((void*) arg,file, enclave_spout_execute);
+            Spout((void*) arg,files, enclave_spout_execute);
         } else if (strcmp(argv[1], "splitter")==0) {
-            arg->windowSize = 0;
+            arg->windowSize = 0.0f;
             arg->multiout = true;
 	    arg->feedbackIP.push_back(j["servers"][0]);
             arg->observerIP.push_back(j["servers"][0]);
@@ -126,11 +129,11 @@ int func_main(int argc, char** argv) {
 	    arg->feedbackPort.push_back(7001);
             Bolt((void*) arg, enclave_splitter_execute, dummy_window_func);
         } else if(strcmp(argv[1], "count")==0) {
-            arg->windowSize=1;
+            arg->windowSize=1.0f;
             Sink((void*) arg, enclave_count_execute, count_window);
         }
         else {
-            arg->windowSize=1;
+            arg->windowSize=0.05f;
             Bolt((void*) arg, enclave_aggregate_execute, aggregate_window);
         }
     } else if(strcmp(argv[1], "observer")==0) {
@@ -138,7 +141,7 @@ int func_main(int argc, char** argv) {
         std::vector<std::vector<int>> receiverPort(1), senderPort(1);
         arg->id = 0;
         arg->name = std::string(argv[1]);
-        arg->prev_stage = j["parallelism"]["count"];
+        arg->prev_stage = j["parallelism"]["aggregate"];
         arg->in_grouping.push_back("key");
         arg->out_grouping.push_back("shuffle");
         senderIP[0].push_back(j["servers"][0]);

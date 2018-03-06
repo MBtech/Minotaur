@@ -19,9 +19,10 @@ scp *IP $IP:$dir/
 ssh $IP "cd $dir; make clean; make"
 done
 
+echo "Deploying now "
 python deploy.py $dir $2
 
-sleep 50
+sleep 100
 
 for IP in ${IPs[@]}
 do

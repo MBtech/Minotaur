@@ -26,7 +26,7 @@ for component in components:
             
 
 # Start the observer
-#ssh.connect(servers[0])
-#cmd = "cd " + parent_directory+ "; ./app " + "observer " + str(0) + " " + sys.argv[2] +" > "+ "observerlog"+str(0)+" 2>&1 &"
-#print cmd
-#ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(cmd)
+ssh.connect(servers[0])
+cmd = "cd " + parent_directory+ "; ./app " + "observer " + str(0) + " " + sys.argv[2] +" > "+ "observerlog"+str(0)+" 2>&1 &"
+print cmd
+ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(cmd)

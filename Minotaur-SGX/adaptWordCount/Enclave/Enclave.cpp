@@ -62,6 +62,7 @@ int counter;
 int prev = 0;
 int total_choices = ROUTE_LEN;
 int wcount = 0;
+int dcount =0;
 
 #ifdef SGX
 static const unsigned char gcm_key[] = {
@@ -216,6 +217,7 @@ void enclave_spout_execute(InputData *input,  OutputSpout * output) {
 #endif
         memcpy(output->message[i], gcm_ct, output->msg_len[i]);
     }
+    free(r);
 }
 
 void enclave_splitter_execute(InputData * input, OutputData * output) {
@@ -233,7 +235,7 @@ void enclave_splitter_execute(InputData * input, OutputData * output) {
     count = s.size();
     unsigned int j = 0;
     output->total_msgs = 0;
-    printf("choices %d", total_choices);
+    //printf("choices %d", total_choices);
     int i =0;
     for(int k = 0; k<count; k++) {
         int length = snprintf( NULL, 0, "%d", 1 );
@@ -277,6 +279,10 @@ void enclave_splitter_execute(InputData * input, OutputData * output) {
             memcpy(output->message[j], gcm_ct, output->msg_len[j]);
             j++;
         }
+        if(total_choices>2) {
+            free(original);
+        }
+        free(r);
     }
 }
 
@@ -332,6 +338,7 @@ void aggregate_window(Parallelism* n , OutputData * output) {
 #endif
         memcpy(output->message[k], gcm_ct, output->msg_len[k]);
         k+=1;
+        free(r);
     }
     prev += output->total_msgs;
     if(it==agg_map.end()) {
@@ -371,7 +378,7 @@ void enclave_observer_execute(InternalInput * input, int prev_stage, OutputData 
             entropy += -1* (processed[x]/total)* log2(processed[x]/total);
         }
         double ideal = -1* log2(1/(float)prev_stage);
-        printf("%.3f",entropy);
+        printf("Current:%.3f",entropy);
 
         total = 0.0;
         for(int x=0; x<prev_stage; x++) {
@@ -381,12 +388,12 @@ void enclave_observer_execute(InternalInput * input, int prev_stage, OutputData 
         for(int x=0; x<prev_stage; x++) {
             entropy_wi += -1* (whatif[x]/total)* log2(whatif[x]/total);
         }
-        printf("%.3f",entropy_wi);
+        printf("Downgrade:%.3f",entropy_wi);
 
         if(entropy<ideal-0.1) {
             wcount ++;
-            printf("Data Leakage");
             if(wcount > 5) {
+            printf("Data Leakage");
                 output->total_msgs = 1;
                 int length = snprintf( NULL, 0, "%d", 1);
                 char* str = (char *)malloc(length+1 );
@@ -407,33 +414,48 @@ void enclave_observer_execute(InternalInput * input, int prev_stage, OutputData 
 #endif
                 memcpy(output->message[0], gcm_ct, output->msg_len[0]);
                 wcount = 0;
+                dcount = 0;
+                free(r);
             } else {
                 output->total_msgs = 0;
             }
-        } else if(entropy_wi>ideal-0.1) {
-            output->total_msgs = 1;
-            int length = snprintf( NULL, 0, "%d", -1);
-            char* str = (char *)malloc(length+1 );
-            snprintf( str, length+1, "%d", -1);
-            std::string word = std::string(str);
-            free(str);
-            output->stream[0] = 0;
-            int valid = 0;
-            int* r = get_route(word,1,  1, 1, &valid);
-            output->routes[0] = *r;
-            output->msg_len[0]  = word.length();
-            char gcm_ct [word.length()];
-            memcpy(gcm_ct, word.c_str(), word.length());
+        } else if(entropy_wi>=ideal-0.1) {
+            dcount ++;
+            if(dcount > 5) {
+            printf("Overprovision");
+                output->total_msgs = 1;
+                int length = snprintf( NULL, 0, "%d", -1);
+                char* str = (char *)malloc(length+1 );
+                snprintf( str, length+1, "%d", -1);
+                std::string word = std::string(str);
+                free(str);
+                output->stream[0] = 0;
+                int valid = 0;
+                int* r = get_route(word,1,  1, 1, &valid);
+                output->routes[0] = *r;
+                output->msg_len[0]  = word.length();
+                char gcm_ct [word.length()];
+                memcpy(gcm_ct, word.c_str(), word.length());
 #ifdef SGX
-            unsigned char ret_tag[16];
-            //encrypt((char * )word.c_str(), word.length(), gcm_ct, ret_tag);
-            memcpy(output->mac[0], ret_tag, 16);
+                unsigned char ret_tag[16];
+                //encrypt((char * )word.c_str(), word.length(), gcm_ct, ret_tag);
+                memcpy(output->mac[0], ret_tag, 16);
 #endif
-            memcpy(output->message[0], gcm_ct, output->msg_len[0]);
-            wcount = 0;
-        }
+                memcpy(output->message[0], gcm_ct, output->msg_len[0]);
+                wcount = 0;
+                dcount =0;
+                free(r);
+            }
+            else {
+                output->total_msgs = 0;
+            }
+        }else{
+	     wcount = 0;
+		dcount = 0;
+	}
         counter = 0;
-    } else {
+    }
+    else {
         counter++;
     }
 //    printf(p_dst);
@@ -484,9 +506,9 @@ void count_window(OutputData * output) {
 }
 
 void enclave_change_routing(Parallelism * n, int change) {
-    printf("Change Mitigation by %d", change);
-    if(total_choices<n->next_parallel[0] && total_choices>2) {
+    if((total_choices<n->next_parallel[0] && change == 1) or (total_choices>2 && change == -1)) {
         total_choices += change;
+        printf("Choices:%d", total_choices);
     }
 }
 
@@ -528,4 +550,5 @@ void enclave_send_metrics(Parallelism *n, InternalOutput * output) {
     memcpy(output->mac[0], ret_tag, 16);
 #endif
     memcpy(output->message[0], gcm_ct, output->msg_len[0]);
+    free(r);
 }

@@ -1,9 +1,11 @@
 #!/bin/bash
 dir=~/Minotaur/Minotaur-SGX/$1
-timeout=(0 200 400 800 1000)
-#timeout=(0)
+#timeout=(0 200 400 800 1000)
+timeout=(0)
 
+rm -rf Metrics_"$1"_"$4"
 mkdir Metrics_"$1"_"$4"
+mkdir Metrics_"$1"_"$4"/details/
 for i in "${timeout[@]}"
 do
 
@@ -14,6 +16,8 @@ cat hosts | xargs -I {} ssh {} "sed -i \"s/#define BUFFER_TIMEOUT.*/#define BUFF
 
 python summarize.py $3 $i
 mv Latency_* Metrics_"$1"_"$4"/
+mv *log* Metrics_"$1"_"$4"/details/
+
 #python percentile.py "$1"-"$4" "$1"-"$4"_metrics_small_"$i"
 done
 

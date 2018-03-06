@@ -117,15 +117,15 @@ int func_main(int argc, char** argv) {
     if(strcmp(argv[1], "spout")==0) {
         Spout((void*) arg,file, enclave_spout_execute);
     } else if (strcmp(argv[1], "splitter")==0) {
-        arg->windowSize = 0;
+        arg->windowSize = 0.0;
 	arg->multiout = true;
         Bolt((void*) arg, enclave_splitter_execute, dummy_window_func);
     } else if(strcmp(argv[1], "count")==0) {
-        arg->windowSize=1;
+        arg->windowSize=1.0;
         Sink((void*) arg, enclave_count_execute, count_window);
     }
     else{
-        arg->windowSize=1;
+        arg->windowSize=0.1;
         Bolt((void*) arg, enclave_aggregate_execute, aggregate_window);
         }
 	return 0;

@@ -210,6 +210,7 @@ void enclave_spout_execute(InputData *input,  OutputSpout * output) {
 #endif
                 memcpy(output->message[i], gcm_ct, output->msg_len[i]);
     }
+    free(r);
 }
 
 void enclave_ma_execute(InputData * input, OutputData * output) {

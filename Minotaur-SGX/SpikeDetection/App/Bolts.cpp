@@ -118,13 +118,13 @@ int func_main(int argc, char** argv) {
     if(strcmp(argv[1], "spout")==0) {
         Spout((void*) arg, file, enclave_spout_execute);
     } else if (strcmp(argv[1], "ma")==0) {
-        arg->windowSize = 0;
+        arg->windowSize = 0.0;
         Bolt((void*) arg, enclave_ma_execute, dummy_window_func);
     } else if(strcmp(argv[1], "spike")==0) {
-        arg->windowSize=0;
+        arg->windowSize=0.0;
         Sink((void*) arg, enclave_spike_execute, dummy_window_sink);
     }else{
-        arg->windowSize=0;
+        arg->windowSize=0.0;
         Bolt((void*) arg, enclave_aggregate_execute, dummy_window_func);
         }
     return 0;

@@ -1,7 +1,10 @@
 {
-        "servers":[
-	"185.64.106.15", "185.64.106.16"
-     ],
+ "servers":[
+"147.75.90.199",
+"147.75.108.29",
+"147.75.108.91",
+"147.75.108.93"
+],
      "topology":{
         "spout" : ["splitter", "shuffle"],
         "splitter" : ["aggregate", "key"],
@@ -10,10 +13,10 @@
  
      "components": ["spout", "splitter","aggregate", "count"],
      "parallelism": {
-        "spout": 2,
-        "splitter": 4,
-        "aggregate": 6,
-        "count": 1
+        "spout": 8,
+        "splitter": 8,
+        "aggregate": 8,
+        "count": 2
       }
    
 }

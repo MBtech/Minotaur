@@ -1,16 +1,10 @@
 {
-        "servers":[
-"147.75.69.99",
-"147.75.90.55",
-"147.75.90.159",
-"147.75.90.219"
+ "servers":[
+"147.75.90.199",
+"147.75.108.29",
+"147.75.108.91",
+"147.75.108.93"
 ],
-"otherservers":[
-"147.75.69.193",
-"147.75.69.65",
-"147.75.70.5",
-"147.75.70.17"
-     ],
      "topology":{
         "spout" : ["splitter", "shuffle"],
         "splitter" : ["count", "key"]
@@ -18,9 +12,9 @@
  
      "components": ["spout", "splitter", "count"],
      "parallelism": {
-        "spout": 4,
+        "spout": 8,
         "splitter": 8,
-        "count": 16
+        "count": 8
       }
    
 }

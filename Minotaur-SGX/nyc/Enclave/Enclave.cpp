@@ -210,6 +210,7 @@ void enclave_spout_execute(InputData *input,  OutputSpout * output) {
 #endif
         memcpy(output->message[i], gcm_ct, output->msg_len[i]);
     }
+	free(r);
 }
 
 
@@ -256,6 +257,7 @@ void enclave_filter_execute(InputData * input, OutputData * output) {
 #endif
         memcpy(output->message[i], gcm_ct, output->msg_len[i]);
     }
+    free(r);
 }
 
 void enclave_aggregate_execute(InputData * input, OutputData * output) {
@@ -344,6 +346,7 @@ void enclave_count_execute(InputData * input, OutputData * output) {
     } else {
         printf("Not Valid. Fake Packet");
     }
+    free(str);
     /*
         #ifdef NATIVE
         printf("%s\n",word.c_str());

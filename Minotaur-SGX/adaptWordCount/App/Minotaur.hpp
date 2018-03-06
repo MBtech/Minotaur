@@ -37,9 +37,9 @@
 #endif
 
 #ifdef NATIVE
-void* Spout (void *arg, std::string file, void (*enclave_func) (InputData* , OutputSpout*));
+void* Spout (void *arg, std::vector<std::string> file, void (*enclave_func) (InputData* , OutputSpout*));
 #else
-void* Spout (void *arg, std::string file, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData* , OutputSpout*));
+void* Spout (void *arg, std::vector<std::string> file, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData* , OutputSpout*));
 #endif
 
 #ifdef NATIVE

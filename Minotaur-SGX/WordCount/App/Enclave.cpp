@@ -211,6 +211,7 @@ void enclave_spout_execute(InputData *input,  OutputSpout * output) {
 #endif
         memcpy(output->message[i], gcm_ct, output->msg_len[i]);
     }
+	free(r);
 }
 
 void enclave_splitter_execute(InputData * input, OutputData * output) {
@@ -263,6 +264,7 @@ void enclave_splitter_execute(InputData * input, OutputData * output) {
             memcpy(output->message[j], gcm_ct, output->msg_len[j]);
             j++;
         }
+	free(r);
     }
 }
 
@@ -320,6 +322,7 @@ void aggregate_window(Parallelism* n , OutputData * output) {
 #endif
         memcpy(output->message[k], gcm_ct, output->msg_len[k]);
         k+=1;
+	free(r);
     }
     prev += output->total_msgs;
     if(it==agg_map.end()) {

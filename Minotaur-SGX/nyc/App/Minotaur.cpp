@@ -10,7 +10,7 @@ void encrypt(char * line, size_t len_pt, unsigned char * gcm_ct, unsigned char *
 
 void dumbVals(int* counter, std::string name, int id) {
     std::ofstream out(name+"processedlog"+std::to_string(id));
-    
+
     while(1) {
         struct timespec tv;
         clock_gettime(CLOCK_REALTIME, &tv);
@@ -19,6 +19,45 @@ void dumbVals(int* counter, std::string name, int id) {
         usleep(10000);
     }
     out.close();
+}
+
+void boltWindow(TimedBuffer* s_buff, Arguments *param, OutputData * output, unsigned long oldestTime, unsigned long oldestTimeN, bool * newWindow,
+                sgx_status_t (*window_func)(sgx_enclave_id_t, Parallelism* n, OutputData*)) {
+    while(true) {
+        struct timespec tv;
+        usleep(param->windowSize*1000000);
+        clock_gettime(CLOCK_REALTIME, &tv);
+        bool flag = true;
+        std::vector<int> para = param->next_stage;
+        Parallelism * parallel = (Parallelism* ) malloc(sizeof(Parallelism));
+        std::copy(para.begin(), para.end(), parallel->next_parallel);
+        while(flag) {
+#ifdef NATIVE
+            window_func(parallel, output);
+#else
+            window_func(global_eid, parallel, output);
+#endif
+            for (int k = 0; k < output->total_msgs; k++) {
+#ifdef SGX
+                s_buff->add_msg(output->stream[k],output->routes[k], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
+#else
+                s_buff->add_msg(output->stream[k], output->routes[k], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
+#endif
+                s_buff->check_and_send(true);
+            }
+
+            if(output->total_msgs==0) {
+                flag = false;
+            }
+
+        }
+
+        struct timespec t;
+        clock_gettime(CLOCK_REALTIME, &t);
+        long latency = calLatency(t.tv_sec, t.tv_nsec, oldestTime, oldestTimeN);
+        std::cout << "L:" << latency<<std::endl;
+        *newWindow = true;
+    }
 }
 
 #ifdef NATIVE
@@ -70,11 +109,11 @@ void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enc
             InputData * input = (InputData* ) malloc(sizeof(InputData));
             OutputSpout * output = (OutputSpout* ) malloc(sizeof(OutputSpout));
             std::copy(n.begin(), n.end(), input->next_parallel);
-	    
-	    std::copy(ctsentence.begin(), ctsentence.end(), input->message);
-	    std::copy(mac.begin(), mac.end(), input->mac);
-	    input->msg_len = ctsentence.length();
-	    input->source = param->id;
+
+            std::copy(ctsentence.begin(), ctsentence.end(), input->message);
+            std::copy(mac.begin(), mac.end(), input->mac);
+            input->msg_len = ctsentence.length();
+            input->source = param->id;
 #ifdef NATIVE
             enclave_func(input, output);
 #else
@@ -115,8 +154,9 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
     Arguments * param = (Arguments*) arg;
     struct timespec tv;
     clock_gettime(CLOCK_REALTIME, &tv);
-    unsigned long beginTime = tv.tv_sec;
-    unsigned long currTime = tv.tv_sec;
+    //float beginTime = (float)tv.tv_sec + (float)tv.tv_nsec/1000000000.0f;
+    struct timespec beginTime = tv;
+//    float currTime = (float)tv.tv_sec + (float)tv.tv_nsec/1000000000.0f;
 
     zmq::context_t * context;
     zmq::socket_t * sender, * receiver;
@@ -140,7 +180,12 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
     else {
         R = ROUTES;
     }
+    InputData * input = (InputData* ) malloc(sizeof(InputData));
+    OutputData * output = (OutputData* ) malloc(sizeof(OutputData));
 
+//    if(param->windowSize>0.0) {
+//        std::thread windowThread(boltWindow, &s_buff,param, output,oldestTime, oldestTimeN, &newWindow,  window_func);
+//    }
     //  Process tasks forever
     while (1) {
         zmq::message_t message;
@@ -160,8 +205,8 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
         std::vector<long> timeNSec = msg.timeNSec;
         std::vector<long> timeSec = msg.timeSec;
 
-        InputData * input = (InputData* ) malloc(sizeof(InputData));
-        OutputData * output = (OutputData* ) malloc(sizeof(OutputData));
+//        InputData * input = (InputData* ) malloc(sizeof(InputData));
+//        OutputData * output = (OutputData* ) malloc(sizeof(OutputData));
         std::vector<std::string> msg_buffer = msg.value;
 #ifdef SGX
         std::vector<std::string> mac_buffer = msg.gcm_tag;
@@ -171,7 +216,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
         std::vector<long>::iterator it2, it3;
 
         std::copy(n.begin(), n.end(), input->next_parallel);
-	int index = 0;
+        int index = 0;
 #ifdef SGX
         it1 = mac_buffer.begin();
 #endif
@@ -209,24 +254,29 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 
 #ifdef SGX
 //                    s_buff.add_msg(output->stream[k],output->routes[k][0], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
-                        s_buff.add_msg(output->stream[k],output->routes[k], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), *it2, *it3);
+                    s_buff.add_msg(output->stream[k],output->routes[k], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), *it2, *it3);
 #else
-                        s_buff.add_msg(output->stream[k], output->routes[k], std::string(output->message[k], output->msg_len[k]), *it2, *it3);
-                        //s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
+                    s_buff.add_msg(output->stream[k], output->routes[k], std::string(output->message[k], output->msg_len[k]), *it2, *it3);
+                    //s_buff.add_msg(output->stream[k], output->routes[k][0], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
 #endif
-                        s_buff.check_and_send(false);
+                    s_buff.check_and_send(false);
 #ifdef SGX
                     ++it1;
 #endif
                 }
             }
-   	index ++;
+            index ++;
         }
 
-        if(param->windowSize>0) {
+        if(param->windowSize >0.0) {
             clock_gettime(CLOCK_REALTIME, &tv);
-            currTime = tv.tv_sec;
-            if(currTime-beginTime>=param->windowSize) {
+            struct timespec currTime = tv;
+            //currTime = (float)tv.tv_sec + (float)tv.tv_nsec/1000000000.0f;
+            //std::cout << tv.tv_nsec << " " << (float)tv.tv_nsec/1000000000.0f << std::endl;
+            //printf("%.2f, %.2f\n", currTime, beginTime);
+            long diff = calLatency(currTime.tv_sec, currTime.tv_nsec, beginTime.tv_sec, beginTime.tv_nsec);
+            if(diff>=param->windowSize*1000000) {
+                //std::cout << currTime - beginTime << std::endl;
                 bool flag = true;
                 std::vector<int> para = param->next_stage;
                 Parallelism * parallel = (Parallelism* ) malloc(sizeof(Parallelism));
@@ -237,14 +287,13 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 #else
                     window_func(global_eid, parallel, output);
 #endif
-                    //std::cout << "Total message: " << output->total_msgs << std::endl;
                     for (int k = 0; k < output->total_msgs; k++) {
 #ifdef SGX
-                            s_buff.add_msg(output->stream[k],output->routes[k], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
+                        s_buff.add_msg(output->stream[k],output->routes[k], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
 #else
-                            s_buff.add_msg(output->stream[k], output->routes[k], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
+                        s_buff.add_msg(output->stream[k], output->routes[k], std::string(output->message[k], output->msg_len[k]), tv.tv_sec, tv.tv_nsec);
 #endif
-                            s_buff.check_and_send(true);
+                        s_buff.check_and_send(true);
                     }
 
                     if(output->total_msgs==0) {
@@ -256,7 +305,6 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
                 struct timespec t;
                 clock_gettime(CLOCK_REALTIME, &t);
                 long latency = calLatency(t.tv_sec, t.tv_nsec, oldestTime, oldestTimeN);
-                //std::cout << "Window Latency: " << latency<<std::endl;
                 std::cout << "L:" << latency<<std::endl;
                 beginTime = currTime;
                 newWindow = true;
@@ -277,8 +325,7 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
     Arguments * param = (Arguments*) arg;
     struct timespec tv;
     clock_gettime(CLOCK_REALTIME, &tv);
-    unsigned long beginTime = tv.tv_sec;
-    unsigned long currTime = tv.tv_sec;
+    struct timespec beginTime = tv;
 
     zmq::context_t * context;
     zmq::socket_t * sender, * receiver;
@@ -356,16 +403,16 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
 
         // If we have windows
         clock_gettime(CLOCK_REALTIME, &tv);
-        currTime = tv.tv_sec;
+	long diff = calLatency(tv.tv_sec, tv.tv_nsec, beginTime.tv_sec, beginTime.tv_nsec);
 //        std::cout << currTime - beginTime << std::endl;
-        if(currTime-beginTime>=param->windowSize) {
+        if(diff>=param->windowSize * 1000000) {
             std::cout << "Printing the map" << std::endl;
 #ifdef NATIVE
             window_func(output);
 #else
             window_func(global_eid, output);
 #endif
-            beginTime = currTime;
+            beginTime = tv;
 
         }
     }

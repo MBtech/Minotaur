@@ -44,9 +44,9 @@
 #define MAX_TUPLE_LEN 100
 #define BUFFER_TIMEOUT 200
 #define MAX_ROUTES 20
-#define ROUTE_LEN 2
-#define ROUTES 2
-#define ROUTE_ALGO 3
+#define ROUTE_LEN 2 
+#define ROUTES 1 
+#define ROUTE_ALGO 4 
 #define SLEEP 100
 #define TOTAL_STREAMS 1
 //#define NATIVE

@@ -1,7 +1,10 @@
 {
-    "servers":[
-"185.64.106.15", "185.64.106.16"
-     ],
+ "servers":[
+"147.75.90.199",
+"147.75.108.29",
+"147.75.108.91",
+"147.75.108.93"
+],
      "topology":{
         "spout" : ["ma", "key"],
         "ma" : ["aggregate", "key"],
@@ -10,9 +13,9 @@
      
      "components": ["spout", "ma","aggregate", "spike"],
      "parallelism": {
-        "spout": 6,
+        "spout": 8,
         "ma": 6,
-        "aggregate": 2,
+        "aggregate": 8,
         "spike": 2
       }
    

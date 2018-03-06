@@ -37,14 +37,16 @@ void sentVals(zmq::context_t* context , zmq::socket_t* sock, int* counter, int i
         metric_buff.add_msg(0, 0, std::to_string(id) + " "+std::string(output->message[0], output->msg_len[0]), std::string((char *)output->mac[0], 16), tv.tv_sec, tv.tv_nsec);
         metric_buff.check_and_send(false);
 //        std::cout << "Tuples processed: " << *counter << std::endl;
-        usleep(10000);
+        usleep(100000);
     }
 }
 
+//TODO implement a timed versions of the spout so that we are able to control the input that is being fed
+//Into the spout
 #ifdef NATIVE
-void* Spout (void *arg, std::string file, void (*enclave_func) (InputData* , OutputSpout*))
+void* Spout (void *arg, std::vector<std::string> files, void (*enclave_func) (InputData* , OutputSpout*))
 #else
-void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData* , OutputSpout*))
+void* Spout (void *arg, std::vector<std::string> files,  sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData* , OutputSpout*))
 #endif
 {
     zmq::context_t * context;
@@ -58,25 +60,36 @@ void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enc
     //  Initialize random number generator
     srandom ((unsigned) time (NULL));
 
-    std::ifstream datafile(file);
-    //std::string ptsentence ("Hello is it me you are looking for?");
-    std::string ptsentence;
+    std::vector<std::vector<std::string>> data;
     std::vector<zmq::socket_t*> sockets(socks->sender, socks->sender+(param->out_grouping.size()*sizeof(zmq::socket_t*)));
     TimedBuffer s_buff(context,sockets, BUFFER_TIMEOUT);
-    std::vector<std::string> datavector;
-    while(std::getline(datafile, ptsentence)) {
-        datavector.push_back(ptsentence);
+    for (int i=0; i <files.size(); i++) {
+        std::ifstream datafile(files[i]);
+        //std::string ptsentence ("Hello is it me you are looking for?");
+        std::string ptsentence;
+        std::vector<std::string> datavector;
+        while(std::getline(datafile, ptsentence)) {
+            datavector.push_back(ptsentence);
+        }
+        data.push_back(datavector);
     }
     sleep(5);
 
     int counter = 0;
     // Start measurement thread
     std::thread t1(dumbVals, &counter, param->name, param->id);
+    int d_index = 0;
+
+    int timeDiff[3] = {30, 30, 30};
+    struct timespec beginTime;
+    clock_gettime(CLOCK_REALTIME, &beginTime);
     while(1) {
+	std::cout<< "Current index being used: " << std::endl;
+        std::vector<std::string> datavector = data[d_index];
         for(int in = 0; in<datavector.size(); in++) {
             struct timespec tv;
             clock_gettime(CLOCK_REALTIME, &tv);
-            ptsentence = datavector[in];
+            std::string ptsentence = datavector[in];
             boost::trim(ptsentence);
             //ptsentence = "Hark. They are speaking";
 #ifdef SGX
@@ -120,6 +133,14 @@ void* Spout (void *arg, std::string file,  sgx_status_t (*enclave_func) (sgx_enc
             usleep(SLEEP);
             counter++;
         }
+
+        struct timespec currTime;
+        clock_gettime(CLOCK_REALTIME, &currTime);
+        if(currTime.tv_sec-beginTime.tv_sec> timeDiff[d_index] && d_index<data.size()-1) {
+            beginTime = currTime;
+            std::cout << "Changing:" << currTime.tv_sec << std::endl;
+            d_index++;
+        }
         //datafile.clear();
         //datafile.seekg(0);
     }
@@ -135,8 +156,7 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
     Arguments * param = (Arguments*) arg;
     struct timespec tv;
     clock_gettime(CLOCK_REALTIME, &tv);
-    unsigned long beginTime = tv.tv_sec;
-    unsigned long currTime = tv.tv_sec;
+    struct timespec beginTime = tv;
 
     zmq::context_t * context;
     zmq::socket_t * sender, * receiver;
@@ -168,17 +188,17 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
         feedback = shuffle_receiver_conn(*context, param->feedbackIP, param->feedbackPort);
 
     }
-
+    std::thread t2 ; 
     zmq::socket_t * observer;
     if(param->observerPort.size()>0) {
         std::cout << param->observerIP.back() << ":" << param->observerPort.back()<<std::endl;
         context = new zmq::context_t(1);
         observer = key_sender_conn(param, *context, param->observerIP, param->observerPort);
+        t2 = std::thread(sentVals, context, observer, &counter, param->id, param);
 
     }
 
-    std::thread t2(sentVals, context, observer, &counter, param->id, param);
-
+    std::cout << "Change:"<<beginTime.tv_sec << " " << "Choices:4"<< std::endl;
     //  Process tasks forever
     while (1) {
         zmq::message_t message;
@@ -261,10 +281,11 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
             index ++;
         }
 
-        if(param->windowSize>0) {
+        if(param->windowSize >0.0) {
             clock_gettime(CLOCK_REALTIME, &tv);
-            currTime = tv.tv_sec;
-            if(currTime-beginTime>=param->windowSize) {
+            struct timespec currTime = tv;
+            long diff = calLatency(currTime.tv_sec, currTime.tv_nsec, beginTime.tv_sec, beginTime.tv_nsec);
+            if(diff>=param->windowSize*1000000) {
                 bool flag = true;
                 std::vector<int> para = param->next_stage;
                 Parallelism * parallel = (Parallelism* ) malloc(sizeof(Parallelism));
@@ -275,7 +296,6 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 #else
                     window_func(global_eid, parallel, output);
 #endif
-                    //std::cout << "Total message: " << output->total_msgs << std::endl;
                     for (int k = 0; k < output->total_msgs; k++) {
 #ifdef SGX
                         s_buff.add_msg(output->stream[k],output->routes[k], std::string(output->message[k], output->msg_len[k]),std::string((char*) output->mac[k], GCM_TAG_LEN), tv.tv_sec, tv.tv_nsec);
@@ -294,7 +314,6 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
                 struct timespec t;
                 clock_gettime(CLOCK_REALTIME, &t);
                 long latency = calLatency(t.tv_sec, t.tv_nsec, oldestTime, oldestTimeN);
-                //std::cout << "Window Latency: " << latency<<std::endl;
                 std::cout << "L:" << latency<<std::endl;
                 beginTime = currTime;
                 newWindow = true;
@@ -302,22 +321,31 @@ void* Bolt(void *arg, sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*
 
             }
         }
+        if(param->feedbackPort.size()>0) {
+            feedback->recv(&message, ZMQ_NOBLOCK);
+            if(feedback->recv(&message, ZMQ_NOBLOCK)>0) {
+                std::cout << "Feedback message received" << std::endl;
+                msgpack::unpacked unpacked_body;
+                msgpack::object_handle oh = msgpack::unpack(reinterpret_cast<const char *> (message.data()), message.size());
 
-        feedback->recv(&message, ZMQ_NOBLOCK);
-        if(feedback->recv(&message, ZMQ_NOBLOCK)>0) {
+                msgpack::object obj = oh.get();
+                try {
+                    obj.convert(msg);
 
-            msgpack::unpacked unpacked_body;
-            msgpack::object_handle oh = msgpack::unpack(reinterpret_cast<const char *> (message.data()), message.size());
-
-            msgpack::object obj = oh.get();
-            obj.convert(msg);
-
-            std::vector<std::string> msg_buffer = msg.value;
-            std::cout << msg_buffer[0] << std::endl;
-            std::vector<int> para = param->next_stage;
-            Parallelism * parallel = (Parallelism* ) malloc(sizeof(Parallelism));
-            std::copy(para.begin(), para.end(), parallel->next_parallel);
-            enclave_change_routing(global_eid, parallel, atoi(msg_buffer[0].c_str()));
+                    std::vector<std::string> msg_buffer = msg.value;
+                    std::cout << msg_buffer[0] << std::endl;
+                    std::vector<int> para = param->next_stage;
+                    Parallelism * parallel = (Parallelism* ) malloc(sizeof(Parallelism));
+                    std::copy(para.begin(), para.end(), parallel->next_parallel);
+                    struct timespec c;
+                    clock_gettime(CLOCK_REALTIME, &c);
+                    std::cout << "Change:" << c.tv_sec << " ";
+                    enclave_change_routing(global_eid, parallel, atoi(msg_buffer[0].c_str()));
+                }
+                catch(...) {
+                    std::cout << "Wrong message cast" << std::endl;
+                }
+            }
         }
 
     }
@@ -333,8 +361,7 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
     Arguments * param = (Arguments*) arg;
     struct timespec tv;
     clock_gettime(CLOCK_REALTIME, &tv);
-    unsigned long beginTime = tv.tv_sec;
-    unsigned long currTime = tv.tv_sec;
+    struct timespec beginTime = tv;
 
     zmq::context_t * context;
     zmq::socket_t * sender, * receiver;
@@ -404,26 +431,27 @@ void* Sink(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, InputData*)
 
             long latency = calLatency(tv.tv_sec, tv.tv_nsec, *it2, *it3);
             //std::cout << "Processing Latency: " << latency<<std::endl;
+            std::cout << "Time:" << tv.tv_sec << std::endl;
             std::cout << "L:" << latency<<std::endl;
 #ifdef SGX
             ++it1;
 #endif
         }
 
-        // If we have windows
+
         clock_gettime(CLOCK_REALTIME, &tv);
-        currTime = tv.tv_sec;
-//        std::cout << currTime - beginTime << std::endl;
-        if(currTime-beginTime>=param->windowSize) {
+        long diff = calLatency(tv.tv_sec, tv.tv_nsec, beginTime.tv_sec, beginTime.tv_nsec);
+        if(diff>=param->windowSize * 1000000) {
             std::cout << "Printing the map" << std::endl;
 #ifdef NATIVE
             window_func(output);
 #else
             window_func(global_eid, output);
 #endif
-            beginTime = currTime;
+            beginTime = tv;
 
         }
+
     }
     return NULL;
 }
@@ -497,6 +525,7 @@ void* Observer(void *arg,sgx_status_t (*enclave_func) (sgx_enclave_id_t, Interna
             enclave_func(global_eid, input, param->prev_stage, output);
 #endif
             clock_gettime(CLOCK_REALTIME, &tv);
+	    std::cout << "Time:"<< tv.tv_sec << std::endl;
 
 #ifdef SGX
             ++it1;
